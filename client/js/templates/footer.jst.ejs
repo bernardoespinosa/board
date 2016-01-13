@@ -47,7 +47,7 @@
  <% if(!_.isUndefined(authuser.user)){%>	
   <% if(!_.isEmpty(role_links.where({slug: "view_board_listing"}))){ %>
   <li class="dropdown hidden-xs board-btn"> 
-	  <a title="Dashboard" href="#" data-toggle="dropdown" class="btn btn-default js-show-boards-list"><span>Boards </span><span><i class="icon-collapse"></i></span> </a>
+	  <a title="Juntas" href="#" data-toggle="dropdown" class="btn btn-default js-show-boards-list"><span>Juntas </span><span><i class="icon-collapse"></i></span> </a>
 	  <ul role="menu" class="dropdown-menu js-dropdown-popup col-xs-12 js-show-add-boards-list">
 	  	 <li class="js-show-boards-list-response"></li>
 		 <li class="clearfix js-qsearch-container js-boards-list-container">
@@ -63,7 +63,7 @@
 			}))) {
 		%>
 			<li class="clearfix js-closed-board-list dropdown dropdown-submenu dropdown js-boards-list-container-search">            
-				<a href="#" class="js-board-dropdown dropdown-toggle js-open-popover" data-toggle="dropdown" title="Closed Boards">Closed Boards</a>
+				<a href="#" class="js-board-dropdown dropdown-toggle js-open-popover" data-toggle="dropdown" title="Juntas Cerradas">Juntas Cerradas</a>
 				<ul class="sidebar-boards-list js-closedboard-list  list-unstyled list-group dropdown-menu"></ul>
 				</li>
 		<%
@@ -73,7 +73,7 @@
 			}))) {
 		%>
 			<li class="clearfix js-board-dropdown js-stared-board-lists dropdown-submenu dropdown js-boards-list-container-search">            
-					<a href="#" class="dropdown-toggle js-open-popover" data-toggle="dropdown" title="Starred Boards">Starred Boards</a>				
+					<a href="#" class="dropdown-toggle js-open-popover" data-toggle="dropdown" title="Juntas con Estrella">Juntas con Estrella</a>				
 					<ul class="sidebar-boards-list js-board-starred-list list-unstyled list-group dropdown-menu"></ul>			
 				</li>
 		<%
@@ -84,14 +84,14 @@
 			}))) {
 		%>
 				<li class="clearfix js-my-board-lists dropdown-submenu dropdown js-boards-list-container-search">			
-					<a href="#" class="js-board-dropdown dropdown-toggle js-open-popover" data-toggle="dropdown" title="My Boards">My Boards</a>
+					<a href="#" class="js-board-dropdown dropdown-toggle js-open-popover" data-toggle="dropdown" title="Mis Juntas">Mis Juntas</a>
 					<ul class="sidebar-boards-list js-myboard-list list-unstyled list-group dropdown-menu"></ul>			
 				</li>
 		<%
 			} 		
 		%>
 			<li class="clearfix js-boards-list-container-search">            
-			<a href="#/" title="Boards">Boards</a>
+			<a href="#/" title="Juntas">Juntas</a>
 			</li>
 		<%
 
@@ -103,7 +103,7 @@
 		%>		
 			<li class="divider js-boards-list-container-search"></li>
 			<li class="js-boards-list-container-search dropdown clearfix">
-				<a title="Add Board or Organization" class="dropdown-toggle js-show-organizations-board-from btn btn-link" data-toggle="dropdown" href="#"><span class="pull-left"><i class="icon-plus"></i></span> Add Board or Organization</a><ul role="menu" class="dropdown-menu dropdown-menu-right js-show-organizations-board-from-response js-dropdown-popup navbar-btn"></ul>
+				<a title="Añadir Junta u Organización" class="dropdown-toggle js-show-organizations-board-from btn btn-link" data-toggle="dropdown" href="#"><span class="pull-left"><i class="icon-plus"></i></span> Añadir Junta u Organización</a><ul role="menu" class="dropdown-menu dropdown-menu-right js-show-organizations-board-from-response js-dropdown-popup navbar-btn"></ul>
 				</li>
 		<%   
 			 }
@@ -112,7 +112,7 @@
 	</li>
   <% } %>
   <% if(typeof(model.user) !== "undefined" && !_.isEmpty(model.user) && (!_.isEmpty(role_links.where({slug: "view_organization_listing"})))){ %>
-  <li class="hidden-xs org-btn"><a title="Organizations" href="#/organizations" class="btn btn-default"><span>Organizations</span></a></li>
+  <li class="hidden-xs org-btn"><a title="Organización" href="#/organizations" class="btn btn-default"><span>Organización</span></a></li>
    <% } %>	
    <% } %>	
 </ul>
