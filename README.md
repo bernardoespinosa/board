@@ -1,5 +1,7 @@
 ### Restyaboard
 
+[![Build Status](https://travis-ci.org/RestyaPlatform/board.svg?branch=master)](https://travis-ci.org/RestyaPlatform/board)
+
 Trello like kanban board. [Restyaboard](http://restya.com/board/) is based on [Restya platform] (http://restya.com/).
 
 ### Demo
@@ -42,7 +44,6 @@ To give you some idea about of our plans:
 * App
   * Simple app architecture
   * "Import from GitHub" sample app
-  * Current API tweaks to accept other oAuth clients "properly"
 * Address some [known issues](http://restya.com/board/issues.html)
 * Notifier iOS App (Possibly, Free and non-open source)
 
