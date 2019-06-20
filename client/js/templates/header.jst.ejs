@@ -14,11 +14,11 @@
 	  	<ul class="nav nav-pills navbar-left">
 	  	<%
 			if(!_.isEmpty(role_links.where({slug: "users_register"}))) {	%>
-		<li class="ldap_login_check <% if(Backbone.history.fragment.indexOf('users/register') != -1){%>active<%}%>"><a href="#/users/register" title="<%- i18next.t('Register') %>"><strong><%- i18next.t("Register") %></strong></a></li>
+		<li class="ldap_login_check <% if(Backbone.history.fragment.indexOf('users/register') != -1){%>active<%}%>"><a href="#/users/register" title="<%- i18next.t('Registro') %>"><strong><%- i18next.t("Registro") %></strong></a></li>
 		 <% 	}
 			if(!_.isEmpty(role_links.where({slug: "users_login"}))){
 		 %>
-		<li class="<% if(Backbone.history.fragment.indexOf('users/login') != -1){%>active<%}%>"><a href="#/users/login" title="<%- i18next.t('Login') %>"><strong><%- i18next.t("Login") %></strong></a></li>
+		<li class="<% if(Backbone.history.fragment.indexOf('users/login') != -1){%>active<%}%>"><a href="#/users/login" title="<%- i18next.t('Iniciar sesión') %>"><strong><%- i18next.t("Iniciar sesión") %></strong></a></li>
 		 <%
 		 	}
 		 %>
@@ -32,21 +32,21 @@
 <% } else if(typeof(user) != "undefined" && !_.isEmpty(current_param) && (current_param === 'activities' || current_param === 'users' || current_param === 'roles' || current_param === 'apps' || current_param === 'settings' || current_param === 'email_templates' || current_param === 'admin_boards_list'|| current_param === 'oauth_clients' || current_param === 'board_user_roles' || current_param === 'organization_user_roles')){ %>
 <% 
 	if(!_.isEmpty(current_param) && (current_param === 'activities')) {
-		current_title = i18next.t('Activities');
+		current_title = i18next.t('Ocupaciones');
 	} else if(!_.isEmpty(current_param) && (current_param === 'users')){ 
-		current_title = i18next.t('Users');
+		current_title = i18next.t('Usuarios');
 	} else if(!_.isEmpty(current_param) && (current_param === 'roles' || current_param === 'board_user_roles' || current_param === 'organization_user_roles')){ 
 		current_title = i18next.t('Roles');
 	} else if(!_.isEmpty(current_param) && (current_param === 'apps')){ 
-		current_title = i18next.t('Apps');
+		current_title = i18next.t('Aplicaciones');
 	} else if(!_.isEmpty(current_param) && (current_param === 'settings')){ 
-		current_title = i18next.t('Settings');
+		current_title = i18next.t('Ajustes');
 	} else if(!_.isEmpty(current_param) && (current_param === 'email_templates')){ 
-		current_title = i18next.t('Email Templates');
+		current_title = i18next.t('Plantillas de correo electrónico');
 	} else if(!_.isEmpty(current_param) && (current_param === 'admin_boards_list')){ 
-		current_title = i18next.t('Boards');
+		current_title = i18next.t('Tableros');
 	} else if(!_.isEmpty(current_param) && (current_param === 'oauth_clients')){ 
-		current_title = i18next.t('Developer applications');
+		current_title = i18next.t('Aplicaciones de desarrollador');
 	} 
 %>
 
@@ -68,9 +68,9 @@
 	 <div class="pull-left well-sm"> <div class="js-dropdown dropdown  docmodal-submenu row">
               <a data-toggle="dropdown" id="dropdownMenu1" class="dropdown-toggle label" href="#"> <i class="icon-cog h3"></i></a>
               <ul role="menu" class="dropdown-menu arrow">
-                 <li class="text-center text-muted"><strong><%- i18next.t("Sort") %></strong></li>
+                 <li class="text-center text-muted"><strong><%- i18next.t("Ordenar") %></strong></li>
                  <li class="divider"></li>
-                 <li><a title="<%- i18next.t('Username') %>" href="#" class="js-sort-by" data-field="username"><%- i18next.t("Username") %></a></li>
+                 <li><a title="<%- i18next.t('Nombre de usuario') %>" href="#" class="js-sort-by" data-field="username"><%- i18next.t("Nombre de usuario") %></a></li>
 				 <li class="dropdown-submenu inner-dropdown dropdown"> <a href="#" title="<%- i18next.t('Roles') %>" data-toggle="dropdown" class="dropdown-toggle js-open-popover"><%- i18next.t("Roles") %></a>
                   <ul class="dropdown-menu">
 				    <li class="inner-dropdown dropdown">
@@ -117,14 +117,14 @@
 	<nav class="navbar-collapse collapse"> 
 	<div class="navbar-right clearfix">
 		<ul class="nav nav-pills navbar-left navbar-btn">
-			<li class="js-admin-activity-menu navbar-btn"><a title="<%- i18next.t('Activities') %>" href="#/activities"><%- i18next.t("Activities") %></a></li>
-			<li class="js-admin-user-menu navbar-btn"><a title="<%- i18next.t('Users') %>" href="#/users"><%- i18next.t("Users") %></a></li>
-			<li class="js-admin-board-menu navbar-btn"><a title="<%- i18next.t('Boards') %>" href="#/boards/list"><%- i18next.t("Boards") %></a></li>
+			<li class="js-admin-activity-menu navbar-btn"><a title="<%- i18next.t('Ocupaciones') %>" href="#/activities"><%- i18next.t("Ocupaciones") %></a></li>
+			<li class="js-admin-user-menu navbar-btn"><a title="<%- i18next.t('Usuarios') %>" href="#/users"><%- i18next.t("Usuarios") %></a></li>
+			<li class="js-admin-board-menu navbar-btn"><a title="<%- i18next.t('Tableros') %>" href="#/boards/list"><%- i18next.t("Tableros") %></a></li>
 			<li class="js-admin-role-menu navbar-btn"><a title="<%- i18next.t('Roles') %>" href="#/roles"><%- i18next.t("Roles") %></a></li>
-			<li class="js-admin-app-menu navbar-btn"><a title="<%- i18next.t('Apps') %>" href="#/apps"><%- i18next.t("Apps") %></a></li>
-			<li class="js-admin-client-menu navbar-btn"><a title="<%- i18next.t('Developer applications') %>" href="#/oauth_clients"><%- i18next.t("Developer applications") %></a></li>
-			<li class="js-admin-setting-menu navbar-btn"><a title="<%- i18next.t('Settings') %>" href="#/settings"><%- i18next.t("Settings") %></a></li>
-			<li class="js-admin-email-menu navbar-btn"><a title="<%- i18next.t('Email Templates') %>" href="#/email_templates"><%- i18next.t("Email Templates") %></a></li>
+			<li class="js-admin-app-menu navbar-btn"><a title="<%- i18next.t('Aplicaciones') %>" href="#/apps"><%- i18next.t("Aplicaciones") %></a></li>
+			<li class="js-admin-client-menu navbar-btn"><a title="<%- i18next.t('Aplicaciones de desarrollador') %>" href="#/oauth_clients"><%- i18next.t("Aplicaciones de desarrollador") %></a></li>
+			<li class="js-admin-setting-menu navbar-btn"><a title="<%- i18next.t('Ajustes') %>" href="#/settings"><%- i18next.t("Ajustes") %></a></li>
+			<li class="js-admin-email-menu navbar-btn"><a title="<%- i18next.t('Plantillas de correo electrónico') %>" href="#/email_templates"><%- i18next.t("Plantillas de correo electrónico") %></a></li>
 		</ul>
 	</div>
 	</nav>
