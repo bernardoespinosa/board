@@ -1,10 +1,10 @@
-#/bin/sh
+#!/bin/bash
 #
 # Restyaboard uninstall
 #
 # Usage: ./restyaboard_uninstall.sh
 #
-# Copyright (c) 2014-2017 Restya.
+# Copyright (c) 2014-2019 Restya.
 # Dual License (OSL 3.0 & Commercial License)
 {
 
@@ -15,9 +15,9 @@
 	fi
 
 	POSTGRES_DBHOST=localhost
-	POSTGRES_DBNAME=restyaboardtest
-	POSTGRES_DBUSER=restyat
-	POSTGRES_DBPASS=hjVl2!rGdt
+	POSTGRES_DBNAME=restyaboard
+	POSTGRES_DBUSER=restya
+	POSTGRES_DBPASS=hjVl2!rGd
 	POSTGRES_DBPORT=5432
 	DOWNLOAD_DIR=/opt/restyaboard
 	version=$(cat ${DOWNLOAD_DIR}/release)
@@ -46,7 +46,7 @@
 			read -r -p "Enter the reason for uninstalling the Restyaboard:" reason
 		done
 
-		curl -v -L -G -d "app=board&ver=${version}&reason=${reason}&os=${OS_REQUIREMENT}" "http://restya.com/uninstall.php"
+		curl -v -L -G -d "app=board&ver=${version}&reason=${reason}&os=${OS_REQUIREMENT}" "https://restya.com/uninstall.php"
 
 		set +x
 		echo "Enter your document root (where your Restyaboard was installed. e.g., /usr/share/nginx/html/restyaboard):"
@@ -66,6 +66,10 @@
 
 		echo "Removing Restyaboard conf file"
 		rm -rf /etc/nginx/conf.d/restyaboard.conf
+
+		echo "Removing Restyaboard temporary files..."
+		rm -rf "$dir/tmp/cache/restya_site_url_for_shell.php"
+		rm -rf "$dir/tmp/cache/restya_client_information.php"
 
 		echo "Clearing the Restyaboard crons"
 		sed -i '/\*\/5 \* \* \* \* $dir\/server\/php\/shell\/instant_email_notification.sh > \/dev\/null 2> \/dev\/null/d' /var/spool/cron/crontabs/root
@@ -131,5 +135,6 @@
 				yum remove nginx
 			esac
 		fi
+		rm -rf ${DOWNLOAD_DIR}/release
 	esac
 } 2>&1 | tee -a restyaboard_uninstall.log

@@ -1,17 +1,34 @@
-<% if(_.isEmpty(attachment.attributes.link) && !_.isEmpty(attachment.attributes.name)){ %>
-	<a target="_blank" href="<%= attachment.downloadLink('download', attachment.attributes.id) %>?view" class="pull-left navbar-btn img-thumbnail">
-	<% if(attachment.attributes.name.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)){ 
-		var picture_path = attachment.showImage('CardAttachment', attachment.attributes.id, 'large_thumb' );
+<% if(_.isEmpty(attachment.attributes.link) && !_.isEmpty(attachment.attributes.name)){ 
+	if(attachment.attributes.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|ico)$/)){ 
+		var picture_path = attachment.showImage('CardAttachment', attachment.attributes.id, 'original' );
+		var picture_thumb = attachment.showImage('CardAttachment', attachment.attributes.id, 'large_thumb' );
 	%>
-		<img src="<%= picture_path %>">
+	<a data-fancybox="images" data-caption="<%= decodeURI(attachment.attributes.name) %>" href="<%= picture_path %>" class="pull-left navbar-btn img-thumbnail js-card-attachment-<%- card_id %>">
+		<% if(attachment.attributes.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp|ico)$/)){ %>
+			<img src="<%= picture_thumb %>">
+		<% } else if(attachment.attributes.name.toLowerCase().match(/\.(webp)$/)){ %>
+			<img src="<%= picture_path %>">
+		<% } %>
+	</a>
+	<% } else if (attachment.attributes.name.toLowerCase().match(/\.(pdf)$/) && !_.isUndefined(attachment.attributes.doc_image_path) && !_.isEmpty(attachment.attributes.doc_image_path) && attachment.attributes.doc_image_path !== null) { 
+		var document_path = attachment.documentLink('Card', attachment.attributes); %>
+		<a data-fancybox="images" data-caption="<%= decodeURI(attachment.attributes.name) %>" href="<%= document_path %>" class="pull-left navbar-btn img-thumbnail js-card-attachment-<%- card_id %>">
+			<img src="/img/<%= attachment.attributes.doc_image_path %>">
+		</a>
 	<% } else {
+		var document_path = attachment.documentLink('Card', attachment.attributes);
 		var extension = attachment.attributes.name.split('.');
 	%>
-		<p class="thumb-img"><%- extension[extension.length - 1].toUpperCase() %></p>
+		<a data-fancybox="images" data-caption="<%= decodeURI(attachment.attributes.name) %>" href="<%= document_path %>" class="pull-left navbar-btn img-thumbnail js-card-attachment-<%- card_id %>"><p class="thumb-img"><%- extension[extension.length - 1].toUpperCase() %></p></a>
 	<% } %>
-	</a>
 <% } else if(!_.isEmpty(attachment.attributes.link)){ %>
-	<a target="_blank" href="<%= attachment.attributes.link %>" title="<%- attachment.attributes.link %>" class="pull-left navbar-btn img-thumbnail">
+	<%   
+		if (navigator.userAgent.toLowerCase().indexOf('uiwebview') > -1) { 
+	%>
+		<a target="_self" href="<%= attachment.attributes.link %>" title="<%- attachment.attributes.link %>" class="pull-left navbar-btn img-thumbnail">
+	<% }else{ %>
+		<a target="_blank" href="<%= attachment.attributes.link %>" title="<%- attachment.attributes.link %>" class="pull-left navbar-btn img-thumbnail">
+	<% } %>
 		<p class="thumb-img">
 		<% if (attachment.attributes.link.indexOf("dropbox.com") > -1) {%>
 			<i class="icon-dropbox"></i>
@@ -19,21 +36,38 @@
 			<i class="icon-cloud"></i>
 		<% } else if(attachment.attributes.link.indexOf("github.com") > -1){ %>
 			<i class="icon-github"></i>
-		<% } else if(!_.isEmpty(attachment.attributes.name) && !_.isEmpty(attachment.attributes.link)) {  var extension = attachment.attributes.name.split('.'); %><% if(!_.isUndefined(extension) && extension.length > 1) { %><% if(attachment.attributes.name.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)){ %><%- extension[extension.length - 1].toUpperCase() %><% } else { %>LINK<% } } %><% }%>
+		<% } else if(!_.isEmpty(attachment.attributes.name) && !_.isEmpty(attachment.attributes.link)) {  var extension = attachment.attributes.name.split('.'); %><% if(!_.isUndefined(extension) && extension.length > 1) { %><% if(attachment.attributes.name.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/)){ %><%- extension[extension.length - 1].toUpperCase() %><% } else { %>LINK<% } } %><% }%>
 		</p>
 	</a>
 <% } %>
 <div class="clearfix">
 <% if(_.isEmpty(attachment.attributes.link) && !_.isEmpty(attachment.attributes.name)){ %>
-		<a target="_blank" href="<%= attachment.downloadLink('download', attachment.attributes.id) %>" title="<%- attachment.attributes.name %>"><span class="show htruncate col-xs-11 nav"><%- attachment.attributes.name %></span><span class="show btn-block col-xs-12"><%- i18next.t('Added') %> <small class="text-muted">
-		<% var created = parse_date(attachment.attributes.created, authuser); %>
-		<abbr class="" title="<%- created.datetime %>"><%- created.timeago %></abbr>
+	<% 
+		if (navigator.userAgent.toLowerCase().indexOf('uiwebview') > -1) { 
+	%>
+		<a target="_self" href="<%= attachment.downloadLink('download', attachment.attributes.id) %>" title="<%- decodeURI(attachment.attributes.name) %>"><span class="show htruncate col-xs-11 nav"><%- decodeURI(attachment.attributes.name) %></span>
+	<% } else { %>
+		<a target="_blank" href="<%= attachment.downloadLink('download', attachment.attributes.id) %>" title="<%- decodeURI(attachment.attributes.name) %>"><span class="show htruncate col-xs-11 nav"><%- decodeURI(attachment.attributes.name) %></span>
+	<% } %>
+		<span class="show btn-block col-xs-12"><%- i18next.t('Added') %> <small class="text-muted">
+		<% setInterval(function() {%>
+			<% parse_date(attachment.attributes.created, authuser, 'js-timeago-card-attachment1-'+attachment.attributes.id); %>
+		<% }, 10000); %>
+		<span class="js-timeago-card-attachment1-<%- attachment.attributes.id %>"><%= parse_date(attachment.attributes.created, authuser, 'js-timeago-card-attachment1-'+attachment.attributes.id, true) %></span>
 		</small></span></a>
 <% } else if(!_.isEmpty(attachment.attributes.link)){ %>
+	<% 
+		if (navigator.userAgent.toLowerCase().indexOf('uiwebview') > -1) { 
+	%>
+		<a target="_self" href="<%= attachment.attributes.link %>" title="<%- attachment.attributes.link %>">
+	<% } else { %>
 		<a target="_blank" href="<%= attachment.attributes.link %>" title="<%- attachment.attributes.link %>">
+	<% } %>
 			<span class="show htruncate col-xs-11 nav"><%- attachment.attributes.link %></span><span class="show btn-block col-xs-12"><%- i18next.t('Added') %> <small class="text-muted">
-			<% var created = parse_date(attachment.attributes.created, authuser); %>
-			<abbr class="" title="<%- created.datetime %>"><%- created.timeago %></abbr>
+			<% setInterval(function() {%>
+				<% parse_date(attachment.attributes.created, authuser, 'js-timeago-card-attachment2-'+attachment.attributes.id); %>
+			<% }, 10000); %>
+		<span class="js-timeago-card-attachment2-<%- attachment.attributes.id %>"><%= parse_date(attachment.attributes.created, authuser, 'js-timeago-card-attachment2-'+attachment.attributes.id, true) %></span>
 			</small></span>
 		</a>
 <% } %>
@@ -48,7 +82,7 @@
 			<% 
 				var download_link = attachment.downloadLink('download', attachment.attributes.id);
 			%>
-				<a target="_blank" href="<%= download_link %>" title="<%- i18next.t('Download') %>">
+			<a target="_blank" href="<%= download_link %>" title="<%- i18next.t('Download') %>">
 				<i class="icon-arrow-down cur icon-light"></i></a>
 			<% } else {%>
 				<% var link_title = 'Open in New Tab'; %>

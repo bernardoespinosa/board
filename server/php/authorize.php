@@ -8,7 +8,7 @@
  * @package    Restyaboard
  * @subpackage Core
  * @author     Restya <info@restya.com>
- * @copyright  2014-2017 Restya
+ * @copyright  2014-2019 Restya
  * @license    http://restya.com/ Restya Licence
  * @link       http://restya.com/
  */
@@ -16,8 +16,8 @@ session_start();
 require_once 'config.inc.php';
 require_once 'libs/core.php';
 require_once 'libs/vendors/OAuth2/Autoloader.php';
-if (file_exists(APP_PATH . '/tmp/cache/site_url_for_shell.php')) {
-    include_once APP_PATH . '/tmp/cache/site_url_for_shell.php';
+if (file_exists(SITE_URL_FOR_SHELL)) {
+    include_once SITE_URL_FOR_SHELL;
 }
 OAuth2\Autoloader::register();
 $oauth_config = array(
@@ -46,13 +46,21 @@ if (!empty($_POST['email']) && !empty($_POST['password'])) {
         $_POST['email']
     );
     $log_user = executeQuery('SELECT id, role_id, password, is_ldap::boolean::int FROM users WHERE email = $1 or username = $1', $val_arr);
-    $_POST['password'] = crypt($_POST['password'], $log_user['password']);
-    $val_arr = array(
-        $_POST['email'],
-        $_POST['password'],
-        1
-    );
-    $user = executeQuery('SELECT * FROM users_listing WHERE (email = $1 or username = $1) AND password = $2 AND is_active = $3', $val_arr);
+    if (is_plugin_enabled('r_ldap_login')) {
+        require_once PLUGIN_PATH . DS . 'LdapLogin' . DS . 'functions.php';
+        $ldap_response = ldapUpdateUser($log_user, $_POST);
+        $ldap_error = $ldap_response['ldap_error'];
+        $user = $ldap_response['user'];
+    }
+    if (!empty($log_user) && $log_user['is_ldap'] == 0) {
+        $_POST['password'] = crypt($_POST['password'], $log_user['password']);
+        $val_arr = array(
+            $_POST['email'],
+            $_POST['password'],
+            1
+        );
+        $user = executeQuery('SELECT * FROM users_listing WHERE (email = $1 or username = $1) AND password = $2 AND is_active = $3', $val_arr);
+    }
     if (!empty($user)) {
         $_SESSION["username"] = $user['username'];
         $error_msg = 0;
@@ -102,7 +110,7 @@ if (!empty($error_msg) && (empty($_POST['authorized']) || (!empty($_POST['author
         $loginPlaceholder = 'Email or Username';
     } ?>
 	<section class="clearfix">
-	  <div class="col-md-5 col-md-offset-4">
+	  <div class="col-md-4 col-md-offset-4">
 		<div class="text-center navbar-btn"><a title="Restya" href="#/"><img title="<?php
     echo SITE_NAME; ?>" alt="[Image: <?php
     echo SITE_NAME; ?>]" src="<?php
@@ -113,13 +121,15 @@ if (!empty($error_msg) && (empty($_POST['authorized']) || (!empty($_POST['author
 					<div class="panel-body well-lg">
 						<form class="form-horizontal clearfix col-xs-12" method="post" role="form" name="UserLoginForm" id="UserLoginForm">
 							<div class="form-group">
-							  <label for="inputEmail" class="sr-only control-label">Email or Username</label>
+							  <label for="inputEmail" class="sr-only control-label"><?php
+    echo __l('Email or Username') ?></label>
 							  <input type="text" placeholder="<?php
     echo $loginPlaceholder; ?>" class="form-control authorize_ldap" id="inputEmail" name="email"  value="<?php
-    echo !empty($_POST['email']) ? $_POST['email'] : ''; ?>" title="" required/>
+    echo !empty($_POST['email']) ? $_POST['email'] : (!empty($_GET['u']) ? $_GET['u'] : ''); ?>" title="" required/>
 							</div>
 							<div class="form-group">
-							  <label for="inputPassword" class="sr-only control-label">Password</label>
+							  <label for="inputPassword" class="sr-only control-label"><?php
+    echo __l('Password') ?></label>
 							  <input type="password" placeholder="Password" class="form-control" id="inputPassword" name="password" title="Password" required/>
 							</div>
 							<div class="form-group">
@@ -129,7 +139,8 @@ if (!empty($error_msg) && (empty($_POST['authorized']) || (!empty($_POST['author
 							<?php
     if (!empty($error_msg) && $error_msg != 1) {
 ?>
-								<div><script>flashMesssage('danger', 'Sorry, login failed. Either your username or password are incorrect.');</script></div>
+								<div><script>flashMesssage('danger', <?php
+        echo __l('Sorry, login failed. Either your username or password are incorrect.') ?>);</script></div>
 							<?php
     } ?>
 						</form>
@@ -143,15 +154,15 @@ if (!empty($error_msg) && (empty($_POST['authorized']) || (!empty($_POST['author
     if (empty($_POST['authorized'])) {
 ?>
             <section class="clearfix">
-			  <div class="col-md-5 col-md-offset-4">
+			  <div class="col-md-4 col-md-offset-4">
 				<div class="text-center navbar-btn"><a title="Restya" href="#/"><img title="<?php
         echo SITE_NAME; ?>" alt="[Image: <?php
         echo SITE_NAME; ?>]" src="<?php
         echo $_server_domain_url . '/img/logo.png'; ?>"></a></div>
 				<div class="well">
 				  <div class="text-center">
-					<div class="h2 list-group-item-heading"> Let <strong><?php
-        echo $oauth_client['client_name']; ?> application </strong> use your account?</div>
+					<div class="h2 list-group-item-heading"> <?php
+        echo sprintf(__l('Let %s use your account?') , '<strong>' . $oauth_client['client_name'] . ' application</strong> '); ?></div>
 					<form method="post">
 					<ul class="list-inline h2">
 					  <li><input type="submit" value="Allow" name="authorized" class="btn btn-primary btn-lg" title="Allow" /></li>
@@ -160,20 +171,26 @@ if (!empty($error_msg) && (empty($_POST['authorized']) || (!empty($_POST['author
 					</form>
 				  </div>
 				  <hr>
-				  <p>You are logged in as <strong><?php
-        echo $user['full_name'] . ' (' . $user['username'] . ')'; ?></strong> The app will be able to use your account <strong> until you disable it.</strong></p>
+				  <p><?php
+        echo sprintf(__l('You are logged in as %s The app will be able to use your account until you disable it.') , '<strong>' . $user['full_name'] . ' (' . $user['username'] . ')</strong>') ?></p>
 				  <hr>
-				  <div class="clearfix"> <strong>The app will be able to:</strong>
+				  <div class="clearfix"> <strong><?php
+        echo __l('The app will be able to') ?>:</strong>
 					<ul>
-					  <li> Read all of your boards and organizations </li>
-					  <li>Create and update cards, lists and boards </li>
-					  <li>Make comments for you </li>
-					  <li>Read your email address </li>
+					  <li><?php
+        echo __l(' Read all of your boards and organizations') ?></li>
+					  <li><?php
+        echo __l('Create and update cards, lists and boards ') ?></li>
+					  <li><?php
+        echo __l('Make comments for you ') ?></li>
+					  <li><?php
+        echo __l('Read your email address') ?></li>
 					</ul>
-					<strong>It won't be able to:</strong>
+					<strong><?php
+        echo __l("It won't be able to") ?>:</strong>
 					<ul>
-					  <li>See your <?php
-        echo SITE_NAME; ?> password </li>
+					  <li><?php
+        echo sprintf(__l('See your %s password') , SITE_NAME) ?></li>
 					</ul>
 				  </div>
 				</div>

@@ -704,7 +704,7 @@ the specific language governing permissions and limitations under the Apache Lic
 
             this.container.attr("title", opts.element.attr("title"));
 
-            this.body = $("body");
+            this.body = $(opts.dropdownParent);
 
             syncCssClasses(this.container, this.opts.element, this.opts.adaptContainerCssClass);
 
@@ -882,7 +882,7 @@ the specific language governing permissions and limitations under the Apache Lic
             if (element.is("option")) {
                 return {
                     id:element.prop("value"),
-                    text:element.text(),
+                    text:filterXSS(element.text()),
                     element: element.get(),
                     css: element.attr("class"),
                     disabled: element.prop("disabled"),
@@ -953,6 +953,7 @@ the specific language governing permissions and limitations under the Apache Lic
                             label.attr("role", "option");
 
                             formatted=opts.formatResult(result, label, query, self.opts.escapeMarkup);
+                            formatted = formatted;
                             if (formatted!==undefined) {
                                 label.html(formatted);
                                 node.append(label);
@@ -997,7 +998,7 @@ the specific language governing permissions and limitations under the Apache Lic
                     var data = { results: [], more: false },
                         term = query.term,
                         children, placeholderOption, process;
-
+                    
                     process=function(element, collection) {
                         var group;
                         if (element.is("option")) {
@@ -1062,7 +1063,7 @@ the specific language governing permissions and limitations under the Apache Lic
                     }
                 }
             }
-            if (typeof(opts.query) !== "function") {
+            if (typeof(opts.query) !== "function" && opts.query !== undefined) {
                 throw "query function not defined for Select2 " + opts.element.attr("id");
             }
 
@@ -1574,6 +1575,7 @@ the specific language governing permissions and limitations under the Apache Lic
             this.liveRegion.text(choice.text());
 
             data = choice.data("select2-data");
+            data = filterXSS(data);
             if (data) {
                 this.opts.element.trigger({ type: "select2-highlight", val: this.id(data), choice: data });
             }
@@ -2405,7 +2407,7 @@ the specific language governing permissions and limitations under the Apache Lic
 
         // single
         onSelect: function (data, options) {
-
+            
             if (!this.triggerSelect(data)) { return; }
 
             var old = this.opts.element.val(),
@@ -3030,18 +3032,18 @@ the specific language governing permissions and limitations under the Apache Lic
 
             formatted=this.opts.formatSelection(data, choice.find("div"), this.opts.escapeMarkup);
             if (formatted != undefined) {
-                if ($(formatted).data('color')) {
-                    var color = $(formatted).data('color');
+                choice.find("div").replaceWith("<div>"+filterXSS(formatted)+"</div>");
+                var color;
+                // Update choosen color for labels
+                if(this.opts.tagColors && this.opts.tagColors[id]){
+                    color = this.opts.tagColors[id]; 
                 }
-                if ($(formatted).data('label')) {
-                    formatted = $(formatted).data('label');
-                }
-                choice.find("div").replaceWith("<div>"+formatted+"</div>");
                 if (color) {
 				    choice.attr("style","background:"+color+";color:#fff;");
                 } else {
                     choice.attr("style","background:#"+this.getLabelcolor(formatted).substring(0, 6)+";color:#fff;");
                 }
+
             }
             cssClass=this.opts.formatSelectionCssClass(data, choice.find("div"));
             if (cssClass != undefined) {
@@ -3437,10 +3439,12 @@ the specific language governing permissions and limitations under the Apache Lic
         },
         separator: ",",
         tokenSeparators: [],
+        tagColors: {},
         tokenizer: defaultTokenizer,
         escapeMarkup: defaultEscapeMarkup,
         blurOnChange: false,
         selectOnBlur: false,
+        dropdownParent: 'body',
         adaptContainerCssClass: function(c) { return c; },
         adaptDropdownCssClass: function(c) { return null; },
         nextSearchTerm: function(selectedObject, currentSearchTerm) { return undefined; },

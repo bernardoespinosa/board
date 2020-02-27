@@ -12,9 +12,11 @@
 					if(timezones !== '') {
 						timezones = settingCategory.get('timezones');
 					}
+					if (!_.isUndefined(settingCategory.get('id')) && !_.isEmpty(settingCategory.get('id')) && (settingCategory.get('id')) !== null) {
 		%>
-				<li <% if (!_.isUndefined(id) && id == settingCategory.get('id')) { %>class="active" <%} else if (_.isUndefined(id) && settingCategory.get('id') == 3) { %>class="active" <%}%> ><a href="#/settings/<%-settingCategory.get('id')%>"><%- i18next.t(settingCategory.get('name')) %></a></li>
-		<% 
+						<li <% if (!_.isUndefined(id) && id == settingCategory.get('id')) { %>class="active" <%} else if (_.isUndefined(id) && settingCategory.get('id') == 3) { %>class="active" <%}%> ><a href="#/settings/<%-settingCategory.get('id')%>" data-setting_category_id="<%-settingCategory.get('id')%>" id="js-setting_trigger"><%- i18next.t(settingCategory.get('name')) %></a></li>
+		<% 			
+					}
 					i++;
 				});
 			}
@@ -27,6 +29,7 @@
 				var j = 0;
 				_.each(list.models, function(settingCategory) {				
 					var settings = settingCategory.get('settings');
+					if (!_.isUndefined(settingCategory.get('id')) && !_.isEmpty(settingCategory.get('id')) && (settingCategory.get('id')) !== null) {
 		%>		
 				<div class="modal-body tab-pane clearfix <% if (!_.isUndefined(id) && id == settingCategory.get('id')) { %> active <%} else if (_.isUndefined(id) && settingCategory.get('id') == 3) { %> active <%} else { %> hide <% } %>" id="settingTab<%- settingCategory.get('id') %>">
 					<% if(!_.isEmpty(settings)){ %>
@@ -39,7 +42,7 @@
 					<% } else { %>
 					<form class="form-horizontal clearfix <% if(settingCategory.get('id') == 2){ %>col-lg-8<% } else { %>col-lg-6<% } %> col-md-8 col-sm-12 col-xs-12 js-setting-list-form" role="form" id="js-setting-list-form">
 					<% } %>
-					<input type="hidden" id="input_setting_category_id" value ="<%- settingCategory.get('id') %>" />
+					<input type="hidden" id="input_setting_category_name" value ="<%- settingCategory.get('name') %>" />
 					<% if(settingCategory.get('id') == 14) { %>
 						<fieldset>
 							<legend>
@@ -272,10 +275,12 @@
 									<% if(setting.name == 'TODO' || setting.name == 'DOING' || setting.name == 'DONE') { %> 
 									</div>
 									<% } %>
-								  <% } else { %>
+								  <% } else if (setting.name === 'R_LDAP_LOGIN_BIND_PASSWORD'){ %>
+									<input type="<%- setting.type %>" id="inputSetting<%- setting.id %>" name="<%- i18next.t(setting.name) %>" class="form-control"/>
+									<% } else {%>
 									<input type="<%- setting.type %>" id="inputSetting<%- setting.id %>" name="<%- i18next.t(setting.name) %>" class="form-control" value="<%- setting.value %>" />
-								  <% } %>
-									<div><span class="help-block"><%= i18next.t(setting.description) %></span></div>
+									<% } %>
+									<div><span class="help-block text-wrap"><%= i18next.t(setting.description) %></span></div>
 								  </div>
 								</div>
 							<% } %>
@@ -308,8 +313,9 @@
 					</form>
 					<% } %>
 				</div>
-		<% j++; %>
-		<% });
+		<%  			j++; 
+					}
+				});
 			} 
 		%>	
 		</div>

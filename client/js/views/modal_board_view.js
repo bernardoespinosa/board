@@ -82,6 +82,7 @@ App.ModalBoardView = Backbone.View.extend({
      * @return false
      */
     renderAttachmentsCollection: function() {
+        $('body').find('#modalListView').remove();
         var view_attachment = this.$('#js-list-attachments-list');
         view_attachment.html('');
         var attachments = this.model.attachments;
@@ -90,11 +91,21 @@ App.ModalBoardView = Backbone.View.extend({
             for (var attachments_i = 0; attachments_i < attachments_length; attachments_i++) {
                 var attachment = attachments.models[attachments_i];
                 var view = new App.AttachmentView({
+                    id: this.model.id,
                     model: attachment,
                     board: this.model
                 });
                 view_attachment.append(view.render().el);
             }
+            _(function() {
+                $(".js-attachment-" + self.model.id).fancybox({
+                    'transitionIn': 'elastic',
+                    'transitionOut': 'elastic',
+                    'speedIn': 600,
+                    'speedOut': 200,
+                    'overlayShow': false
+                });
+            }).defer();
         } else {
             var empty_view = new App.AttachmentView({
                 model: null

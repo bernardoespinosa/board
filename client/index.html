@@ -6,6 +6,7 @@
   <meta name="description" content="Restyaboard powered kanban board. Download open source from http://restya.com/board/">
   <meta name="keywords" content="Restyaboard, http://restya.com/board/">
   <!--[if lt IE 9]><script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.6.1/html5shiv.js"></script><![endif]-->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1">
   <meta name="theme-color" content="#f47564">
   <link rel="manifest" href="manifest.json">
@@ -13,11 +14,14 @@
   <!-- build:css css/default.cache.css -->
   <link rel="stylesheet" type="text/css" href="./css/fullcalendar.css">
   <link rel="stylesheet" type="text/css" href="./css/bootstrap-datetimepicker.min.css">
+  <link rel="stylesheet" type="text/css" href="./css/jquery.fancybox.css">
   <link rel="stylesheet" type="text/css" href="./css/bootstrap.css">
   <link rel="stylesheet" type="text/css" href="./css/jquery.dockmodal.css">
   <link rel="stylesheet" type="text/css" href="./css/select2-bootstrap.css">
   <link rel="stylesheet" type="text/css" href="./css/flag.css">
+  <link rel="stylesheet" type="text/css" href="./css/highlight-github.css">
   <link rel="stylesheet" type="text/css" href="./css/jquery-ui.css">
+  <link rel="stylesheet" type="text/css" href="./css/bootstrap-colorpicker.css">
   <!-- endbuild -->
   <link id="favicon" rel="shortcut icon" href="favicon.ico">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -44,16 +48,19 @@
   </script>
   <script>
         window.addEventListener('load', function(e) {
-            window.applicationCache.addEventListener('updateready', function(e) {
+            if(window.applicationCache){
+                window.applicationCache.addEventListener('updateready', function(e) {
                 if (window.applicationCache.status == window.applicationCache.UPDATEREADY) {
                     if (confirm('A new version of this site is available. Load it?')) {
                         window.location.reload();
                     }
                 }
             }, false);
+          }
         }, false);
     </script>
   <!-- build:js js/default.cache.js -->
+  <script src="./js/libs/snuggsi.min.js"></script>
   <script src="./js/libs/jquery-1.8.3.js"></script>
   <script src="./js/libs/jquery.placeholder.js"></script>
   <script src="./js/libs/emojify.min.js"></script>
@@ -78,14 +85,15 @@
   <script src="./js/libs/select2.js"></script>
   <script src="./js/libs/ImageSelect.jquery.js"></script>
   <script src="./js/libs/date.format.js"></script>
+  <script src="./js/libs/jquery.fancybox.js"></script>
   <script src="./js/libs/jquery.gritter.min.js"></script>
   <script src="./js/libs/jquery.scrollTo-min.js"></script>
   <script src="./js/libs/jquery.dockmodal.js"></script>
   <script src="./js/libs/Markdown.Converter.js"></script>
   <script src="./js/libs/tag-it.js"></script>
   <script src="./js/libs/jquery.iframe-transport.js"></script>
+  <script src="./js/libs/highlight.js"></script>
   <script src="./js/libs/showdown.js"></script>
-  <script src="./js/libs/xss.min.js"></script>
   <script src="./js/libs/showdown-target-blank.min.js"></script>
   <script src="./js/libs/showdown-xss-filter.js"></script>
   <script src="./js/libs/fullcalendar.min.js"></script>
@@ -103,6 +111,7 @@
   <script src="./js/libs/jquery-bootstrap-pagination.js"></script>
   <script src="./js/libs/jquery.sparkline.js"></script>
   <script src="./js/libs/localforage.js"></script>
+  <script src="./js/libs/xss.js"></script>
   <script src="./js/libs/locale.js"></script>
   <script src="./js/libs/splitter.js"></script>
   <script src="./js/libs/musical.js"></script>
@@ -119,6 +128,7 @@
   <script src="./js/libs/moment.js"></script>
   <script src="./js/libs/moment-timezone.js"></script>
   <script src="./js/libs/moment-timezone-with-data.js"></script>
+  <script src="./js/libs/bootstrap-colorpicker.js"></script>
   <script src="./js/models/oauth.js"></script>
   <script src="./js/models/user.js"></script>
   <script src="./js/models/board.js"></script>
@@ -156,6 +166,7 @@
   <script src="./js/models/acl_organization_links.js"></script>
   <script src="./js/models/organization_user_roles.js"></script>
   <script src="./js/models/chat_history.js"></script>
+  <script src="./js/models/intro_view_model.js"></script>
   <script src="./js/collections/user_collection.js"></script>
   <script src="./js/collections/attachment_collection.js"></script>
   <script src="./js/collections/list_collection.js"></script>
@@ -191,11 +202,13 @@
   <script src="./js/collections/acl_organization_links_collection.js"></script>
   <script src="./js/collections/board_user_roles_collection.js"></script>
   <script src="./js/collections/chat_history_collection.js"></script>
+  <script src="./js/collections/intro_videoCollection.js"></script>
   <script src="./js/templates/templates.js"></script>
   <script src="./js/views/application_view.js"></script>
   <script src="./js/views/admin_user_add_view.js"></script>
   <script src="./js/views/register_view.js"></script>
   <script src="./js/views/login_view.js"></script>
+  <script src="./js/views/authenticate_view.js"></script>
   <script src="./js/views/list_view.js"></script>
   <script src="./js/views/activity_view.js"></script>
   <script src="./js/views/board_view.js"></script>
@@ -209,6 +222,7 @@
   <script src="./js/views/organizations_user_view.js"></script>
   <script src="./js/views/boards_user_view.js"></script>
   <script src="./js/views/chat_view.js"></script>
+  <script src="./js/views/intro_video_view.js"></script>
   <script src="./js/views/card_view.js"></script>
   <script src="./js/views/modal_card_view.js"></script>
   <script src="./js/views/modal_list_view.js"></script>
@@ -220,6 +234,7 @@
   <script src="./js/views/card_checklist_item_view.js"></script>
   <script src="./js/views/user_view.js"></script>
   <script src="./js/views/user_index_view.js"></script>
+  <script src="./js/views/user_logins_index_view.js"></script>
   <script src="./js/views/board_simple_view.js"></script>
   <script src="./js/views/role_index_view.js"></script>
   <script src="./js/views/role_settings_view.js"></script>
@@ -262,7 +277,6 @@
   <script src="./js/views/edit_activity_form_view.js"></script>
   <script src="./js/views/activity_reply_form_view.js"></script>
   <script src="./js/views/activity_add_form_view.js"></script>
-  <script src="./js/views/card_duedate_from_view.js"></script>
   <script src="./js/views/card_label_form_view.js"></script>
   <script src="./js/views/card_search_result_view.js"></script>
   <script src="./js/views/copy_from_existing_card_view.js"></script>
@@ -276,6 +290,7 @@
   <script src="./js/views/organization_add_view.js"></script>
   <script src="./js/views/board_add_view.js"></script>
   <script src="./js/views/organizations_board_form_view.js"></script>
+  <script src="./js/views/board_import_form_view.js"></script>
   <script src="./js/views/user_cards_view.js"></script>
   <script src="./js/views/checklist_item_add_form_view.js"></script>
   <script src="./js/views/checklist_delete_confirm_form_view.js"></script>
@@ -323,6 +338,7 @@
   <script src="./js/views/organizations_list_view.js"></script>
   <script src="./js/views/email_template_view.js"></script>
   <script src="./js/views/user_activity_view.js"></script>
+  <script src="./js/views/user_logins_index_container_view.js"></script>
   <script src="./js/views/user_index_container_view.js"></script>
   <script src="./js/views/selected_board_visibility_view.js"></script>
   <script src="./js/views/modal_activity_view.js"></script>
@@ -330,6 +346,7 @@
   <script src="./js/views/modal_music_view.js"></script>
   <script src="./js/views/flickr_view.js"></script>
   <script src="./js/views/board_404_view.js"></script>
+  <script src="./js/views/organization_404_view.js"></script>
   <script src="./js/views/organization_header_view.js"></script>
   <script src="./js/views/user_view_header_view.js"></script>
   <script src="./js/views/organizations_lists_header_view.js"></script>
@@ -344,6 +361,7 @@
   <script src="./js/views/admin_activity_index_view.js"></script>
   <script src="./js/views/show_sync_google_calendar_view.js"></script>
   <script src="./js/views/show_copy_board_view.js"></script>
+  <script src="./js/views/invite_user_view.js"></script>
   <script src="./js/views/music_repeat_view.js"></script>
   <script src="./js/views/admin_board_view.js"></script>
   <script src="./js/views/admin_boards_index_view.js"></script>
@@ -351,6 +369,7 @@
   <script src="./js/views/chat_history_view.js"></script>
   <script src="./js/views/emoji_list_view.js"></script>
   <script src="./js/views/checklist_item_emoji_list_view.js"></script>
+  <script src="./js/views/admin_users_logins_view.js"></script>
   <script src="./js/views/admin_user_index_view.js"></script>
   <script src="./js/views/admin_boards_list_view.js"></script>
   <script src="./js/views/oauth_applications_view.js"></script>
@@ -366,10 +385,13 @@
   <script src="./js/views/label_delete_confirm_view.js"></script>
   <script src="./js/views/subscribe_board_confirm_view.js"></script>
   <script src="./js/views/unsubscribe_board_confirm_view.js"></script>
-  <script src="./js/views/archive_card_delete_confirm_view.js"></script>
-  <script src="./js/views/archive_list_delete_confirm_view.js"></script>
+  <script src="./js/views/archived_cards_delete_confirm_view.js"></script>
+  <script src="./js/views/archived_card_delete_confirm_view.js"></script>
+  <script src="./js/views/archived_list_delete_confirm_view.js"></script>
+  <script src="./js/views/archived_lists_delete_confirm_view.js"></script>
   <script src="./js/views/modal_shortcut_view.js"></script>
   <script src="./js/common.js"></script>
+  <script src="./js/filterUtility.js"></script>
   <script src="./js/application.js"></script>
   <!-- endbuild -->
  </body>

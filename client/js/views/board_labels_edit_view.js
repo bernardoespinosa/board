@@ -21,7 +21,7 @@ App.BoardLabelsEditView = Backbone.View.extend({
     template: JST['templates/board_labels_edit'],
     tagName: 'li',
     converter: new showdown.Converter({
-        extensions: ['targetblank', 'xssfilter']
+        extensions: ['targetblank', 'xssfilter', 'codehighlight']
     }),
     /** 
      * Events
@@ -64,8 +64,9 @@ App.BoardLabelsEditView = Backbone.View.extend({
         var self = this;
         var data = {};
         data.label_id = $(e.target).closest('form').find('#label_id').val();
-        data.name = $(e.target).closest('form').find('#inputCardLabel').val();
+        data.name = $.trim($(e.target).closest('form').find('#inputCardLabel').val());
         data.color = $(e.target).closest('form').find('#color').val();
+        data.board_id = self.model.id;
         var card_label = new App.Label();
         card_label.set('board_id', self.model.id);
         card_label.set('id', data.label_id);

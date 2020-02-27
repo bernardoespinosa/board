@@ -50,7 +50,6 @@ App.BoardMemberAddSearchResultView = Backbone.View.extend({
         var self = this;
         board_user.set('board_id', this.board.attributes.id);
         board_user.set('user_id', this.model.attributes.id);
-        board_user.set('board_user_role_id', 2);
         board_user.set(this.model.toJSON());
         delete board_user.attributes.id;
         this.$el.remove();
@@ -62,10 +61,20 @@ App.BoardMemberAddSearchResultView = Backbone.View.extend({
         }, {
             success: function(model, response) {
                 $.removeCookie('chat_initialize');
-                response.boards_users.board_user_role_id = 2;
-                response.boards_users.user_id = parseInt(response.boards_users.user_id);
-                board_user.set(response.boards_users);
-                self.board.board_users.add(board_user);
+                if (!_.isUndefined(response) && !_.isEmpty(response) && response !== null) {
+                    if (!_.isUndefined(response.board_user_role_id) && !_.isEmpty(response.board_user_role_id) && response.board_user_role_id !== null) {
+                        response.boards_users.board_user_role_id = parseInt(response.board_user_role_id);
+                    } else {
+                        response.boards_users.board_user_role_id = 2;
+                    }
+                    response.boards_users.user_id = parseInt(response.boards_users.user_id);
+                    response.boards_users.id = parseInt(response.boards_users.id);
+                    board_user.set(response.boards_users);
+                    if (response.activity) {
+                        board_user.set('board_name', response.activity.board_name);
+                    }
+                    self.board.board_users.add(board_user);
+                }
             }
         });
         return false;

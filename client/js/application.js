@@ -8,6 +8,7 @@ var card_ids, card_ids_ref = '';
 var view_type, view_type_ref = '';
 var trigger_dockmodal = false;
 var viewed_board = new App.Board();
+var is_online = true;
 var is_offline_data = false;
 var set_interval_id = '';
 var isRunning = false;
@@ -18,11 +19,17 @@ var FLICKR_API_KEY = '';
 var LABEL_ICON = '';
 var SITE_TIMEZONE = '';
 var LDAP_LOGIN_ENABLED = '';
+var IS_TWO_FACTOR_AUTHENTICATION_ENABLED;
 var DEFAULT_LANGUAGE = '';
 var IMAP_EMAIL = '';
 var ANIMATION_SPEED = 1;
 var DEFAULT_CARD_VIEW = '';
+var CALENDAR_VIEW_CARD_COLOR = '';
 var PAGING_COUNT = '';
+var ALLOWED_FILE_EXTENSIONS = '';
+var R_LDAP_LOGIN_HANDLE = '';
+var R_MLDAP_LOGIN_HANDLE = '';
+var R_MLDAP_SERVERS = '';
 var last_activity = '';
 var previous_date = '';
 var SecuritySalt = 'e9a556134534545ab47c6c81c14f06c0b8sdfsdf';
@@ -33,19 +40,38 @@ var last_user_activity_id = 0,
 var xhrPool = [];
 var APPS = [];
 var load_count = 1;
+var load_gantt = 1;
 var from_url = '';
 var custom_fields = {};
-Backbone.View.prototype.flash = function(type, message, delay) {
+var sort_by = '';
+var sort_direction = '';
+var view_type_tab = '';
+var AppsFunction = [];
+var appsurlFunc = {};
+var overallApps = [];
+
+Backbone.View.prototype.flash = function(type, message, delay, position, align) {
     if (!delay) {
         delay = 4000;
     }
+    if (position) {
+        position = 'bottom';
+    } else {
+        position = 'top';
+    }
+    if (align) {
+        align = align;
+    } else {
+        align = 'right';
+    }
+
     $.bootstrapGrowl(message, {
         type: type,
         offset: {
-            from: 'top',
+            from: position,
             amount: 20
         },
-        align: 'right',
+        align: align,
         width: 250,
         delay: delay,
         allow_dismiss: true,
@@ -74,6 +100,13 @@ Backbone.View.prototype.downloadLink = function(model, id) {
     var download_link = window.location.pathname + 'download/' + id + '/' + hash;
     return download_link;
 };
+Backbone.View.prototype.documentLink = function(model, data) {
+    var extension = data.name.split('.');
+    var ext = extension[extension.length - 1];
+    var hash = calcMD5(SecuritySalt + 'CardAttachment' + data.id + ext + 'original');
+    var document_link = window.location.pathname + 'img/original/CardAttachment/' + data.id + '.' + hash + '.' + ext;
+    return document_link;
+};
 hasOfflineStatusCode = function(xhr) {
     var offlineStatusCodes, _ref, __indexOf = [].indexOf || function(item) {
         for (var i = 0, l = this.length; i < l; i++) {
@@ -84,6 +117,9 @@ hasOfflineStatusCode = function(xhr) {
     offlineStatusCodes = Backbone.DualStorage.offlineStatusCodes;
     if (_.isFunction(offlineStatusCodes)) {
         offlineStatusCodes = offlineStatusCodes(xhr);
+    }
+    if (xhr.statusText === 'abort') {
+        return false;
     }
     return _.isUndefined(xhr) || xhr.status === 0 || (_ref = xhr.status, __indexOf.call(offlineStatusCodes, _ref) >= 0);
 };
@@ -96,13 +132,13 @@ callbackTranslator = {
             $('#progress').width('101%').delay(200).fadeOut(400, function() {
                 $(this).remove();
             });
-            var is_online = false;
             if ((($.cookie('is_offline_data') !== undefined && $.cookie('is_offline_data') !== null) && $.cookie('is_offline_data') === "true")) {
                 is_offline_data = true;
             } else {
                 is_offline_data = false;
             }
             if (hasOfflineStatusCode(model)) {
+                is_online = false;
                 $.cookie('is_offline_data', true);
                 is_offline_data = true;
                 model.is_offline = true;
@@ -133,7 +169,7 @@ callbackTranslator = {
                 $('#content').html(view.el);
                 return;
             } else if (model !== null && !_.isUndefined(model.status) && model.status == '401') {
-                if (!_.isUndefined(model.responseText) && !_.isEmpty(model.responseText) && JSON.parse(model.responseText).error.type === 'OAuth') {
+                if ((!_.isUndefined(model.responseText) && !_.isEmpty(model.responseText) && JSON.parse(model.responseText).error.type === 'OAuth') || (!_.isUndefined(model.statusText) && !_.isEmpty(model.statusText) && model.statusText === 'Unauthorized')) {
                     api_token = '';
                     if ($.cookie('auth') !== undefined && $.cookie('auth') !== null) {
                         var Auth = JSON.parse($.cookie('auth'));
@@ -178,6 +214,17 @@ callbackTranslator = {
                         model: authuser
                     }).el);
                     return;
+                } else if (!_.isUndefined(current_url) && current_url['1'] == 'organization') {
+                    $.cookie('redirect_link', window.location.hash);
+                    changeTitle('Organization not found');
+                    this.headerView = new App.HeaderView({
+                        model: authuser
+                    });
+                    $('#header').html(this.headerView.el);
+                    $('#content').html(new App.Organization404View({
+                        model: authuser
+                    }).el);
+                    return;
                 }
             } else {
                 return callback.call(null, model, resp, options);
@@ -187,7 +234,13 @@ callbackTranslator = {
 };
 Backbone.sync = function(method, model, options) {
     if (!_.isUndefined(model.storeName) && model.storeName === 'activity') {
-        $('#js-footer-brand-img').attr('src', 'img/logo-icon-sync.gif');
+        if (is_online && is_offline_data) {
+            is_offline_data = false;
+            $.removeCookie('is_offline_data');
+            $('#js-footer-brand-img').attr('title', i18next.t('Syncing...')).attr('src', 'img/logo-icon-sync.gif').attr('data-original-title', i18next.t('Syncing...')).tooltip("show");
+            var offline_data = new App.ListCollection();
+            offline_data.syncDirty();
+        }
     } else {
         if ($('#progress').length === 0) {
             $('body').append($('<div><dt/><dd/></div>').attr('id', 'progress'));
@@ -234,7 +287,17 @@ var RealXHRSend = XMLHttpRequest.prototype.send;
 var requestCallbacks = [];
 var responseCallbacks = [];
 
-function fireCallbacks(callbacks, xhr) {
+function fireRequestCallbacks(callbacks, xhr, arg) {
+    for (var i = 0; i < callbacks.length; i++) {
+        if (!_.isUndefined(arg) && !_.isUndefined(arg[0]) && arg[0] && !(arg[0] instanceof FormData)) {
+            callbacks[i](xhr, arg);
+        } else {
+            callbacks[i](xhr);
+        }
+    }
+}
+
+function fireResponseCallbacks(callbacks, xhr) {
     for (var i = 0; i < callbacks.length; i++) {
         callbacks[i](xhr);
     }
@@ -250,7 +313,9 @@ function addResponseCallback(callback) {
 
 function fireResponseCallbacksIfCompleted(xhr) {
     if (xhr.readyState === 4) {
-        fireCallbacks(responseCallbacks, xhr);
+        if (xhr.responseURL.indexOf(window.location.origin) !== -1) {
+            fireResponseCallbacks(responseCallbacks, xhr);
+        }
     }
 }
 
@@ -265,7 +330,7 @@ function proxifyOnReadyStateChange(xhr) {
 }
 XMLHttpRequest.prototype.send = function() {
     // Fire request callbacks before sending the request
-    fireCallbacks(requestCallbacks, this);
+    fireRequestCallbacks(requestCallbacks, this, arguments);
     // Wire response callbacks
     if (this.addEventListener) {
         var self = this;
@@ -288,9 +353,14 @@ var AppRouter = Backbone.Router.extend({
         'users/forgotpassword': 'forgotpassword',
         'users/activation/:id/:hash': 'user_activation',
         'users/:id/changepassword': 'changepassword',
+        'users?query_param': 'users_index',
         'users': 'users_index',
+        'user_logins?page=:page': 'user_logins_index',
+        'user_logins': 'user_logins_index',
+        'boards/list?query_param': 'admin_boards_index',
         'boards/list': 'admin_boards_index',
         'user/:id': 'user_view',
+        'user/:id/two-step-verification': 'user_verification',
         'user/:id/:type': 'user_view_type',
         'boards': 'boards_index',
         'boards/starred': 'starred_boards_index',
@@ -299,11 +369,14 @@ var AppRouter = Backbone.Router.extend({
         'board/:id/card/:card_id': 'card_view',
         'board/:id/:type': 'boards_view_type',
         'board/:id/:type/card/:card_id': 'board_card_view_type',
+        'board/:id/:type/:tab': 'boards_view_type_tab',
+        'board/:id/:type?query_param': 'boards_view_type',
         'organizations': 'organizations_index',
         'organization/:id': 'organizations_view',
         'organization/:id/:type': 'organizations_view_type',
         'organizations_user/:id': 'organizations_user_view',
         'roles': 'role_settings',
+        'roles?tab=:tab': 'role_settings',
         'roles/add': 'add_role',
         'board_user_roles/add': 'add_board_user_role',
         'organization_user_roles/add': 'add_organization_user_role',
@@ -312,6 +385,8 @@ var AppRouter = Backbone.Router.extend({
         'oauth_clients/edit/:id': 'edit_oauth_client',
         'apps': 'apps',
         'apps/:name': 'app_settings',
+        'apps/:name/manage': 'app_settings_manage',
+        'apps/:name/:page': 'app_page',
         'settings': 'settings',
         'settings/:id': 'settings_type',
         'email_templates': 'email_templates',
@@ -342,6 +417,13 @@ var AppRouter = Backbone.Router.extend({
         $('.dockmodal, .dockmodal-overlay').remove();
         new App.ApplicationView({
             model: 'login'
+        });
+    },
+    user_verification: function(id) {
+        $('.dockmodal, .dockmodal-overlay').remove();
+        new App.ApplicationView({
+            model: 'user_verification',
+            'id': id
         });
     },
     forgotpassword: function() {
@@ -398,9 +480,11 @@ var AppRouter = Backbone.Router.extend({
             success: function() {
                 $.removeCookie('auth');
                 delete(App.boards);
+                custom_fields = {};
                 $.removeCookie('chat_initialize');
-                localforage.removeItem('r_zapier_access_token');
-                localforage.removeItem('board_filter');
+                $.removeCookie('filter');
+                $.removeCookie('activities_filter');
+                localforage.clear();
                 api_token = '';
                 authuser = new App.User();
                 app.navigate('#/users/login', {
@@ -416,6 +500,9 @@ var AppRouter = Backbone.Router.extend({
                 view.flash('success', 'Logout successfully.');
             }
         });
+        if ($('#content').hasClass('intro_video')) {
+            $('#content').removeClass('intro_video');
+        }
     },
     settings: function() {
         new App.ApplicationView({
@@ -444,6 +531,7 @@ var AppRouter = Backbone.Router.extend({
         });
     },
     boards_view: function(id) {
+        $('.dockmodal, .dockmodal-overlay').remove();
         from_url = 'board_view';
         new App.ApplicationView({
             model: 'boards_view',
@@ -470,7 +558,17 @@ var AppRouter = Backbone.Router.extend({
         });
     },
     boards_view_type: function(id, type) {
+        $('.dockmodal, .dockmodal-overlay').remove();
         view_type = type;
+        view_type_ref = type;
+        new App.ApplicationView({
+            model: 'boards_view',
+            'id': id
+        });
+    },
+    boards_view_type_tab: function(id, type, tab) {
+        view_type = type;
+        view_type_tab = tab;
         view_type_ref = type;
         new App.ApplicationView({
             model: 'boards_view',
@@ -497,14 +595,22 @@ var AppRouter = Backbone.Router.extend({
             'id': id
         });
     },
-    users_index: function() {
+    users_index: function(page) {
         new App.ApplicationView({
-            model: 'users_index'
+            model: 'users_index',
+            page: page
         });
     },
-    admin_boards_index: function() {
+    user_logins_index: function(page) {
         new App.ApplicationView({
-            model: 'admin_boards_index'
+            model: 'user_logins_index',
+            page: page
+        });
+    },
+    admin_boards_index: function(page) {
+        new App.ApplicationView({
+            model: 'admin_boards_index',
+            page: page
         });
     },
     user_view: function(id) {
@@ -514,15 +620,45 @@ var AppRouter = Backbone.Router.extend({
         });
     },
     user_view_type: function(id, type) {
-        new App.ApplicationView({
-            model: 'user_view',
-            'id': id,
-            type: type
-        });
+        if ($.cookie('auth') !== null && !_.isUndefined($.cookie('auth')) && !_.isEmpty($.cookie('auth'))) {
+            var Auth_check = JSON.parse($.cookie('auth'));
+            if (Auth_check.user.id == id || Auth_check.user.role_id == '1' || type === 'cards' || type === "profile") {
+                new App.ApplicationView({
+                    model: 'user_view',
+                    'id': id,
+                    type: type
+                });
+            } else {
+                $('.dockmodal, .dockmodal-overlay').remove();
+                var User = new App.User();
+                User.url = api_url + 'users/logout.json';
+                User.fetch({
+                    cache: false,
+                    success: function() {
+                        $.removeCookie('auth');
+                        api_token = '';
+                        authuser = new App.User();
+                        app.navigate('#/users/login', {
+                            trigger: true,
+                            replace: true
+                        });
+                        clearInterval(set_interval_id);
+                    }
+                });
+            }
+        } else {
+            $.cookie('redirect_link', window.location.hash);
+            new App.ApplicationView({
+                model: 'user_view',
+                'id': id,
+                type: type
+            });
+        }
     },
-    role_settings: function() {
+    role_settings: function(tab) {
         new App.ApplicationView({
             model: 'role_settings',
+            tab: tab
         });
     },
     add_role: function() {
@@ -567,6 +703,19 @@ var AppRouter = Backbone.Router.extend({
             id: id
         });
     },
+    app_settings_manage: function(name) {
+        new App.ApplicationView({
+            model: 'app_settings_manage',
+            name: name
+        });
+    },
+    app_page: function(name, page) {
+        new App.ApplicationView({
+            model: 'app_page',
+            name: name,
+            page: page
+        });
+    },
     organizations_index: function() {
         new App.ApplicationView({
             model: 'organizations_index'
@@ -598,8 +747,39 @@ var AppRouter = Backbone.Router.extend({
 var app = new AppRouter();
 app.on('route', function(route, params) {
     $('div.doughnutTip').remove();
-    if (route !== 'boards_view' && route !== 'card_view' && route !== 'board_card_view_type' && route !== 'boards_view_type') {
+    if (route !== 'boards_view' && route !== 'card_view' && route !== 'board_card_view_type' && route !== 'boards_view_type' && route !== 'boards_view_type_tab' && route !== 'boards_index') {
         $('body').removeAttr('style class');
+    }
+});
+$(window).on('hashchange', function() {
+    if (location.hash === '#/boards' && $('#boards-index').length === 0) {
+        app.navigate('#/boards', {
+            trigger: true,
+            replace: true
+        });
+        $('.js-footer-board-link').trigger('click');
+    }
+    if (!_.isUndefined(appsurlFunc)) {
+        _.each(appsurlFunc, function(funct_names, url) {
+            if (location.hash.match('/' + url)) {
+                _.each(funct_names, function(functionName) {
+                    if (typeof AppsFunction[functionName] === 'function') {
+                        AppsFunction[functionName]();
+                    }
+                });
+            } else {
+                // Board view Page Navigation triggering
+                if (location.hash.match('/board/([0-9])*/list')) {
+                    if ($('#listview_table').length === 0) {
+                        $('.js-switch-list-view').trigger('click');
+                    }
+                } else if (location.hash.match('/board/([0-9])*/calendar')) {
+                    if ($('.calendar-view').length === 0) {
+                        $('.js-switch-calendar-view').trigger('click');
+                    }
+                }
+            }
+        });
     }
 });
 Backbone.history.start({

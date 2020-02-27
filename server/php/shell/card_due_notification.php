@@ -8,20 +8,22 @@
  * @package    Restyaboard
  * @subpackage Core
  * @author     Restya <info@restya.com>
- * @copyright  2014-2017 Restya
+ * @copyright  2014-2019 Restya
  * @license    http://restya.com/ Restya Licence
  * @link       http://restya.com/
  */
-$app_path = dirname(dirname(__FILE__));
-require_once $app_path . '/config.inc.php';
-require_once $app_path . '/libs/core.php';
+if (!defined('APP_PATH')) {
+    $app_path = dirname(dirname(__FILE__));
+    require_once $app_path . '/config.inc.php';
+    require_once $app_path . '/libs/core.php';
+}
 global $_server_domain_url;
-if (file_exists(APP_PATH . '/tmp/cache/site_url_for_shell.php')) {
-    include_once APP_PATH . '/tmp/cache/site_url_for_shell.php';
+if (file_exists(SITE_URL_FOR_SHELL)) {
+    include_once SITE_URL_FOR_SHELL;
 }
 if ($db_lnk) {
     $qry_val_arr = array();
-    $result = pg_query_params($db_lnk, "SELECT * FROM cards_listing WHERE is_due_date_notification_sent = false and notification_due_date <= (NOW() + '1 day'::INTERVAL);", $qry_val_arr);
+    $result = pg_query_params($db_lnk, "SELECT * FROM cards_listing WHERE is_due_date_notification_sent = false and is_archived = 0 and notification_due_date <= (NOW() + '1 day'::INTERVAL);", $qry_val_arr);
     while ($card = pg_fetch_assoc($result)) {
         $data_val = array(
             'true',

@@ -59,13 +59,14 @@ App.BoardSimpleView = Backbone.View.extend({
      *
      */
     render: function() {
+        var self = this;
         this.$el.html(this.template({
             board: this.model,
             message: this.message,
             starred_boards: this.starred_boards
         }));
         if (this.model !== null) {
-            this.model.lists.sortByColumn('position');
+            this.model.lists.sortByColumn('position', 'asc');
             var data = [];
             var color_codes = ['#DB7093', '#F47564', '#EDA287', '#FAC1AD', '#FFE4E1', '#D3ABF0', '#DC9CDC', '#69BFBA', '#66CDAA', '#8FBC8F', '#CBFDCA', '#EEE8AA', '#BC8F8F', '#CD853F', '#D2B48C', '#F5DEB3', '#64BCF2', '#87CEFA', '#B0C4DE', '#D6E2F7'];
             var i = 0;
@@ -73,8 +74,12 @@ App.BoardSimpleView = Backbone.View.extend({
                 if (!list.attributes.is_archived) {
                     var _data = {};
                     _data.title = list.attributes.name;
-                    _data.value = list.attributes.card_count;
-                    _data.color = color_codes[i];
+                    _data.value = parseInt(list.attributes.card_count);
+                    if (!_.isEmpty(list.attributes.color) && !_.isUndefined(list.attributes.color) && list.attributes.color !== null && list.attributes.color !== 'null' && list.attributes.color !== 'NULL') {
+                        _data.color = list.attributes.color;
+                    } else {
+                        _data.color = color_codes[i];
+                    }
                     i++;
                     if (i > 20) {
                         i = 0;
@@ -84,9 +89,8 @@ App.BoardSimpleView = Backbone.View.extend({
                     }
                 }
             });
-            var _this = this;
             _(function() {
-                _this.$el.find('.js-chart').html('').drawDoughnutChart(data);
+                self.$el.find('.js-chart-' + self.model.id).html('').drawDoughnutChart(data);
             }).defer();
         }
         this.showTooltip();
@@ -101,27 +105,52 @@ App.BoardSimpleView = Backbone.View.extend({
      *
      */
     showBoardListAddForm: function(e) {
-        var workflow_template = new App.WorkFlowTemplateCollection();
-        workflow_template.url = api_url + 'workflow_templates.json';
-        workflow_template.fetch({
-            success: function(model, response) {
-                var templates = '';
-                var target = $(e.target);
-                var parent = target.parents('.js-show-add-boards-list-simple');
-                $('li.js-back').addClass('hide');
-                var data = {};
-                data = workflow_template;
-                data.page_mode = 1;
-                $('.js-show-boards-list-simple-response', parent).html(new App.BoardAddView({
-                    model: data
-                }).el).find('#inputtemplatelist').select2({
-                    formatResult: function(repo) {
-                        markup = '<div class="clearfix"><span class="show">' + repo.text + '</span><span class="show small">' + repo.id + '</span></div>';
-                        return markup;
+        if (!_.isUndefined(authuser.user) && !_.isEmpty(authuser.user) && authuser.user !== null) {
+            var organization_id;
+            var target = $(e.target);
+            var data = {};
+            var parent = target.parents('.js-show-add-boards-list-simple');
+            if (target.parents('.js-organization_boards')) {
+                organization_id = target.parents('.js-organization_boards').data('organization_id');
+            }
+            var load_workflow_template = false;
+            load_workflow_template = (parseInt(authuser.user.role_id) === 1 || !_.isEmpty(role_links.where({
+                slug: "view_workflow_templates"
+            })));
+            target.parents('li.js-back').addClass('hide');
+            if (load_workflow_template) {
+                var workflow_template = new App.WorkFlowTemplateCollection();
+                workflow_template.url = api_url + 'workflow_templates.json';
+                workflow_template.fetch({
+                    success: function(model, response) {
+                        data = workflow_template;
+                        data.page_mode = 1;
+                        if (organization_id) {
+                            data.organization_id = organization_id;
+                            data.page_mode = 2;
+                        }
+                        $('.js-show-boards-list-simple-response', parent).html(new App.BoardAddView({
+                            model: data
+                        }).el).find('#inputtemplatelist').select2({
+                            formatResult: function(repo) {
+                                markup = '<div class="clearfix"><span class="show">' + repo.text + '</span><span class="show small">' + repo.id + '</span></div>';
+                                return markup;
+                            }
+                        });
                     }
                 });
+            } else {
+                data.page_mode = 1;
+                if (organization_id) {
+                    data.organization_id = organization_id;
+                    data.page_mode = 2;
+                }
+                $('.js-show-boards-list-simple-response', parent).html(new App.BoardAddView({
+                    model: data
+                }).el);
             }
-        });
+            $('footer').trigger('footerActionRendered');
+        }
         return false;
     },
     /**
@@ -227,8 +256,7 @@ App.BoardSimpleView = Backbone.View.extend({
      *
      */
     closePopup: function(e) {
-        var el = this.$el;
-        var target = el.find(e.target);
+        var target = $(e.currentTarget);
         target.parents('.js-show-add-boards-list-simple').find('.js-show-add-boards-simple').removeClass('hide');
         target.parents('.js-show-add-boards-list-simple').find('.js-show-boards-list-simple-response').html('');
         return false;

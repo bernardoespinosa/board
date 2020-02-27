@@ -25,11 +25,8 @@ if (typeof App === 'undefined') {
  * @extends Backbone.View
  */
 App.BoardHeaderView = Backbone.View.extend({
-    className: 'navbar navbar-default',
-    attributes: {
-        role: 'navigation'
-    },
     template: JST['templates/board_header'],
+    id: "board_view_header",
     /**
      * Constructor
      * initialize default values and actions
@@ -40,19 +37,48 @@ App.BoardHeaderView = Backbone.View.extend({
         }
         this.model.lists.bind('change:name', this.showArchivedListLists, this);
         this.model.lists.bind('change:is_archived', this.showArchivedListLists, this);
+        this.model.lists.bind('change:is_archived', this.switchListView, this);
+        this.model.bind('change:board_visibility', this.render, this);
+        this.model.bind('change:is_closed', this.render, this);
         this.model.lists.bind('remove', this.showArchivedListLists, this);
         this.model.cards.bind('change:name', this.showArchivedCardsList, this);
+        this.model.cards.bind('change:is_archived', this.updateListView, this);
         this.model.cards.bind('change:is_archived', this.showArchivedCardsList, this);
         this.model.cards.bind('remove', this.showArchivedCardsList, this);
+        this.model.cards.bind('add', this.cardFilter, this);
+        this.model.cards.bind('add', this.updateListView, this);
+        this.model.cards.bind('remove', this.updateListView, this);
+        this.model.cards.bind('change:list_id', this.updateListView, this);
+        this.model.cards.bind('change:comment_count', this.updateListView, this);
+        this.model.cards.bind('change:custom_fields', this.updateListView, this);
+        this.model.cards.bind('change:custom_fields', this.switchCalendarView, this);
+        this.model.cards.bind('change:due_date', this.updateListView, this);
+        this.model.cards.bind('change:due_date', this.switchCalendarView, this);
+        this.model.cards.bind('change:name', this.updateListView, this);
+        this.model.cards.bind('change:card_voter_count', this.updateListView, this);
+        this.model.cards.bind('change:attachment_count', this.updateListView, this);
+        this.model.cards.bind('change:checklist_item_completed_count', this.updateListView, this);
+        this.model.cards.bind('add:labels', this.updateListView, this);
+        this.model.cards.bind('change:labels', this.updateListView, this);
+        this.model.cards.bind('add:users', this.updateListView, this);
+        this.model.cards.bind('change:users', this.updateListView, this);
+        this.model.lists.bind('remove', this.updateListView, this);
         this.model.bind('change:organization_id', this.render, this);
         this.model.bind('change:background_picture_url', this.showChangeBackground, this);
         this.model.bind('change:background_pattern_url', this.showChangeBackground, this);
         this.model.bind('change:music_name', this.showChangeBackground, this);
         this.model.bind('change:music_content', this.showChangeBackground, this);
+        this.model.bind('change:name', this.renderBoardName, this);
+        this.model.bind('change:is_show_image_front_of_card', this.showAdditionalSettings, this);
+        this.model.bind('change:auto_subscribe_on_board', this.showAdditionalSettings, this);
+        this.model.bind('change:auto_subscribe_on_card', this.showAdditionalSettings, this);
+        this.model.bind('change:sort_by', this.showAdditionalSettings, this);
+        this.model.bind('change:sort_direction', this.showAdditionalSettings, this);
         this.model.board_users.bind('add', this.showFilters, this);
         this.model.board_users.bind('remove', this.showFilters, this);
         this.model.labels.bind('add', this.showFilters, this);
         this.model.labels.bind('change', this.showLabels, this);
+        this.model.labels.bind('change:color', this.switchCalendarView, this);
         this.model.labels.bind('remove', this.showLabels, this);
         this.authuser = authuser.user;
         this.renderAdminBoardUsers();
@@ -81,16 +107,19 @@ App.BoardHeaderView = Backbone.View.extend({
         'click .js-add-board-member-dropdown': 'addBoardMemberDropdown',
         'click .js-close-popover-board-member-dropdown': 'closeBoardMemberDropdown',
         'click .js-show-subscribe-form': 'showSubscribeForm',
+        'click .js-show-board-actions': 'showBoardActions',
         'click .js-show-unsubscribe-form': 'showUnsubscribeForm',
         'click .js-switch-grid-view': 'switchGridView',
         'click .js-switch-list-view': 'switchListView',
         'click .js-switch-calendar-view': 'switchCalendarView',
         'click .js-show-filters': 'showFilters',
+        'click .js-invite-users': 'showInviteUserView',
         'click .js-show-labels': 'showLabels',
         'click .js-archived-items': 'showArchivedItems',
         'click .js-sync-google-dropdown': 'syncGoogleDropdown',
         'click .js-show-copy-board': 'showCopyBoard',
         'click .js-syn-google-calendar': 'showSyncGoogleCalendar',
+        'click .js-choose-columns': 'showChooseColumns',
         'click .js-close-sub-popover': 'closeSubPopup',
         'click #js-select-google-sync-url': 'selectGoogleSyncUrl',
         'click .js-change-background': 'showChangeBackground',
@@ -102,8 +131,10 @@ App.BoardHeaderView = Backbone.View.extend({
         'click .js-close-board': 'closeBoard',
         'click .js-toggle-label-filter': 'toggleCardFilter',
         'click .js-toggle-member-filter': 'toggleCardFilter',
+        'click .js-toggle-color-filter': 'toggleCardFilter',
         'click .js-clear-filter-btn': 'clearAll',
         'click .js-due-filter': 'toggleCardFilter',
+        'click .js-filter-mode': 'toggleCardFilter',
         'click .js-back-to-sidebar': 'backToSidebar',
         'click .js-board-user-avatar-click': 'boardUserAvatarDropdown',
         'click .js-close-board-user-avatar': 'closeBoardUserAvatarDropdown',
@@ -150,7 +181,9 @@ App.BoardHeaderView = Backbone.View.extend({
         'keyup[k] body': 'keyboardShowPrevCardModal',
         'keyup[j] body': 'keyboardShowNextCardModal',
         'click .js-show-chat-modal': 'showChatListModal',
-        'click .js-show-chat-history-modal': 'showChatHistoryModal'
+        'click .js-show-chat-history-modal': 'showChatHistoryModal',
+        'click .js-load-more-archived-cards': 'loadMoreArchivedCardsList',
+        'click .js-load-more-archived-lists': 'loadMoreArchivedListLists'
     },
     /**
      * loadBoardName()
@@ -270,6 +303,17 @@ App.BoardHeaderView = Backbone.View.extend({
         }).el);
         return false;
     },
+
+    showBoardActions: function(e) {
+        $('.js-back-to-sidebar').trigger('click');
+        var self = this;
+        _(function() {
+            if (self.model !== null && !_.isUndefined(self.model) && !_.isEmpty(self.model)) {
+                $('body').trigger('boardActionRendered', [self.model.id, self.model]);
+            }
+        }).defer();
+    },
+
     showUnsubscribeForm: function(e) {
         $('.js-setting-response').html(new App.UnsubscribeBoardConfirmView({
             model: this.model,
@@ -335,7 +379,9 @@ App.BoardHeaderView = Backbone.View.extend({
             is_closed: 1
         }, {
             patch: true,
-            success: function(model, response) {}
+            success: function(model, response) {
+                $(e.target).parents('div.dropdown:first, li.dropdown:first').removeClass('open');
+            }
         });
         return false;
     },
@@ -393,6 +439,7 @@ App.BoardHeaderView = Backbone.View.extend({
                 autoUpload: true,
                 singleFileUploads: true,
                 dropZone: $('#custom-background-dropzone'),
+                pasteZone: null,
                 formData: $('form.js-cusotm-background-add').serialize(),
                 fileUploadHTML: '<input id="cusotmBackgroundUpload" type="file" name="attachment"/>',
             });
@@ -430,7 +477,26 @@ App.BoardHeaderView = Backbone.View.extend({
      * @return false
      *
      */
+    renderBoardName: function(e) {
+        var self = this;
+        if (!_.isUndefined(self.model.attributes) && (!_.isEmpty(self.model.attributes))) {
+            var el = this.$el;
+            if (el.find('.js-rename-board').length > 0) {
+                el.find('.js-rename-board').html('');
+                el.find('.js-rename-board').attr('title', self.model.attributes.name);
+                el.find('.js-rename-board').html('<strong>' + self.model.attributes.name + '</strong>');
+            }
+        }
+    },
     showArchivedItems: function(e) {
+        this.page = 1;
+        this.start = 0;
+        this.start_filter = 0;
+        this.page_filter = 1;
+        this.listpage = 1;
+        this.liststart = 0;
+        this.liststart_filter = 0;
+        this.listpage_filter = 1;
         var el = this.$el;
         e.preventDefault();
         el.find('.side-bar').addClass('side-bar-large');
@@ -454,7 +520,25 @@ App.BoardHeaderView = Backbone.View.extend({
      * @return false
      *
      */
-    showArchivedCardsList: function() {
+    showArchivedCardsList: function(e) {
+        if (!_.isUndefined(e)) {
+            this.start = 0;
+            this.start_filter = 0;
+            this.listpage = 1;
+            this.listpage_filter = 1;
+            this.page = 1;
+            this.page_filter = 1;
+        }
+        this.start = (this.start !== 0) ? this.start : 0;
+        this.page = (this.page !== 1) ? this.page : 1;
+        if (this.$el.find('#js-load-more-archived-cards').hasClass('hide')) {
+            this.$el.find('#js-load-more-archived-cards').removeClass('hide').addClass('show');
+        }
+        if (this.$el.find('#js-load-more-archived-lists').hasClass('show')) {
+            this.$el.find('.js-load-more-archived-lists').removeClass('show').addClass('hide');
+        } else {
+            this.$el.find('.js-load-more-archived-lists').addClass('hide');
+        }
         var self = this;
         if (!_.isUndefined(authuser.user) && (authuser.user.role_id == 1 || !_.isEmpty(this.model.acl_links.where({
                 slug: 'view_archived_cards',
@@ -464,25 +548,103 @@ App.BoardHeaderView = Backbone.View.extend({
             var filtered_cards = this.model.cards.where({
                 is_archived: 1
             });
-            el.find('.js-archived-items-container').html(new App.ArchivedCardsView({
-                model: this.model
-            }).el);
-            if (!_.isEmpty(filtered_cards)) {
-                $('.js-delete-all-archived-cards-confirm').removeClass('hide');
-                _.each(filtered_cards, function(card) {
-                    card.acl_links = self.model.acl_links;
-                    card.board_users = self.model.board_users;
-                    el.find('.js-archived-cards-container').append(new App.ArchivedCardView({
-                        model: card
+            var archived_card = '';
+            var archivedcards = new App.CardCollection();
+            if (!_.isEmpty(this.q)) {
+                if (self.page_filter == 1) {
+                    el.find('.js-archived-items-container').html(new App.ArchivedCardsView({
+                        model: this.model
                     }).el);
+                }
+                archived_card = el.find('.js-archived-cards-container');
+                filtered_cards = filtered_cards.filter(function(model) {
+                    return ~model.get('name').toUpperCase().indexOf(self.q.toUpperCase());
                 });
+                archivedcards.add(filtered_cards);
+                archivedcards.sortByColumn('modified', 'desc');
+                if (!_.isEmpty(archivedcards) && archivedcards.length > 0) {
+                    $('.js-delete-all-archived-cards-confirm').removeClass('hide');
+                    _.each(archivedcards.models, function(card, key) {
+                        count = self.page_filter * PAGING_COUNT;
+                        if (key === self.start_filter) {
+                            if (count > (self.start_filter)) {
+                                self.start_filter++;
+                                card.acl_links = self.model.acl_links;
+                                card.board_users = self.model.board_users;
+                                card.board = self.model;
+                                var view = new App.ArchivedCardView({
+                                    model: card
+                                });
+                                archived_card.append(view.render().el);
+                            }
+                            if (archivedcards.length == self.start_filter) {
+                                self.$el.find('.js-load-more-archived-cards').removeClass('show').addClass('hide');
+                            }
+                        }
+                    });
+                } else {
+                    $('.js-delete-all-archived-cards-confirm').addClass('hide');
+                    $('.js-delete-all-archived-cards').addClass('hide');
+                    this.$el.find('.js-load-more-archived-cards').removeClass('show').addClass('hide');
+                    archived_card.append(new App.ArchivedCardView({
+                        model: null
+                    }).el);
+                }
             } else {
-                $('.js-delete-all-archived-cards-confirm').addClass('hide');
-                $('.js-delete-all-archived-cards').addClass('hide');
-                el.find('.js-archived-cards-container').append(new App.ArchivedCardView({
-                    model: null
-                }).el);
+                archivedcards.add(filtered_cards);
+                archivedcards.sortByColumn('modified', 'desc');
+                if (self.page == 1) {
+                    el.find('.js-archived-items-container').html(new App.ArchivedCardsView({
+                        model: this.model
+                    }).el);
+                }
+                archived_card = el.find('.js-archived-cards-container');
+                if (!_.isEmpty(archivedcards) && archivedcards.length > 0) {
+                    $('.js-delete-all-archived-cards-confirm').removeClass('hide');
+                    _.each(archivedcards.models, function(card, key) {
+                        count = self.page * PAGING_COUNT;
+                        if (key === self.start) {
+                            if (count > (self.start)) {
+                                self.start++;
+                                card.acl_links = self.model.acl_links;
+                                card.board_users = self.model.board_users;
+                                card.board = self.model;
+                                var view = new App.ArchivedCardView({
+                                    model: card
+                                });
+                                archived_card.append(view.render().el);
+                            }
+                            if (archivedcards.length == self.start) {
+                                self.$el.find('.js-load-more-archived-cards').removeClass('show').addClass('hide');
+                            }
+                        }
+                    });
+                } else {
+                    $('.js-delete-all-archived-cards-confirm').addClass('hide');
+                    $('.js-delete-all-archived-cards').addClass('hide');
+                    this.$el.find('.js-load-more-archived-cards').removeClass('show').addClass('hide');
+                    archived_card.append(new App.ArchivedCardView({
+                        model: null
+                    }).el);
+                }
             }
+        }
+        return false;
+    },
+    /**
+     * loadMoreArchivedCardsList()
+     * display the archived cards list
+     * @return false
+     *
+     */
+    loadMoreArchivedCardsList: function(e) {
+        e.preventDefault();
+        if (!_.isEmpty(this.q)) {
+            this.page_filter++;
+            this.showArchivedCardsList();
+        } else {
+            this.page++;
+            this.showArchivedCardsList();
         }
         return false;
     },
@@ -493,39 +655,42 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     showFilteredArchivedCardsList: function(e) {
+        e.preventDefault();
+        var self = this;
+        self.start_filter = 0;
         if (!_.isUndefined(authuser.user) && (authuser.user.role_id == 1 || !_.isEmpty(this.model.acl_links.where({
                 slug: 'view_archived_cards',
                 board_user_role_id: parseInt(this.model.board_user_role_id)
             })))) {
             var el = this.$el;
-            var search_q = $(e.currentTarget).val();
-            var filtered_cards = '';
-            if (!_.isEmpty(search_q)) {
-                filtered_cards = this.model.cards.filter(function(model) {
-                    return ~model.get('name').indexOf(search_q);
-                });
-            } else {
-                filtered_cards = this.model.cards.where({
-                    is_archived: 1
+            this.q = $(e.currentTarget).val();
+            var filtered_cards = this.model.cards.where({
+                is_archived: 1
+            });
+            var archivedcards = new App.CardCollection();
+            if (!_.isEmpty(this.q)) {
+                filtered_cards = filtered_cards.filter(function(model) {
+                    return ~model.get('name').toUpperCase().indexOf(self.q.toUpperCase());
                 });
             }
+            archivedcards.add(filtered_cards);
+            archivedcards.sortByColumn('modified', 'desc');
             el.find('.js-archived-cards-container').html('');
-            if (!_.isEmpty(filtered_cards)) {
-                var _i = 0;
-                _.each(filtered_cards, function(card) {
-                    if (parseInt(card.attributes.is_archived) === 1) {
-                        el.find('.js-archived-cards-container').append(new App.ArchivedCardView({
-                            model: card
-                        }).el);
-                        _i++;
+            if (!_.isEmpty(archivedcards) && archivedcards.length > 0) {
+                _.each(archivedcards.models, function(card, key) {
+                    count = self.page_filter * PAGING_COUNT;
+                    if (key === self.start_filter) {
+                        if (count >= (self.start_filter)) {
+                            self.start_filter++;
+                            el.find('.js-archived-cards-container').append(new App.ArchivedCardView({
+                                model: card
+                            }).el);
+                        }
+                        if (archivedcards.length == self.start_filter) {
+                            self.$el.find('.js-load-more-archived-cards').removeClass('show').addClass('hide');
+                        }
                     }
                 });
-                if (_i === 0) {
-                    el.find('.js-archived-cards-container').append(new App.ArchivedCardView({
-                        model: null
-                    }).el);
-                }
-
             } else {
                 el.find('.js-archived-cards-container').append(new App.ArchivedCardView({
                     model: null
@@ -571,12 +736,26 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     showAdditionalSettings: function(e) {
-        e.preventDefault();
         var el = this.$el;
         el.find('.js-setting-response').html(new App.BoardAdditionalSettingsView({
             model: this.model,
         }).el);
         return false;
+    },
+    /**
+     * showInviteUserView()
+     * show the filter list
+     * @param e
+     * @type Object(DOM event)
+     * @return false
+     *
+     */
+    showInviteUserView: function(e) {
+        e.preventDefault();
+        var el = this.$el;
+        el.find('.js-setting-response').html(new App.InviteUserView({
+            model: this.model
+        }).el);
     },
     /**
      * showFilters()
@@ -589,6 +768,8 @@ App.BoardHeaderView = Backbone.View.extend({
     showFilters: function() {
         $('.js-side-bar-' + this.model.id).addClass('side-bar-large');
         var el = this.$el;
+        this.model.labels.setSortField('name', 'asc');
+        this.model.labels.sort();
         el.find('.js-setting-response').html(new App.BoardFilterView({
             model: this.model,
             labels: this.model.labels
@@ -665,6 +846,7 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     showListModal: function(e) {
+        $(e.target).parents('.js-setting-response').parent().removeClass('open');
         var modalView = new App.ModalBoardView({
             model: this.model
         });
@@ -678,94 +860,375 @@ App.BoardHeaderView = Backbone.View.extend({
      * @type Object(DOM event)
      *
      */
-    switchListView: function() {
-        $('body').removeClass('modal-open');
-        $('#boards-view').removeClass('col-xs-12');
-        $('#switch-board-view').removeClass('calendar-view');
-        $('#switch-board-view').addClass('board-viewlist col-xs-12');
-        $('li.js-switch-view').removeClass('active');
-        $('a.js-switch-list-view').parent().addClass('active');
-        $('.js-list-form').removeClass('hide');
-        var current_param = Backbone.history.fragment;
-        if (current_param.indexOf('/list') === -1) {
-            app.navigate('#/board/' + this.model.id + '/list', {
-                trigger: false,
-                trigger_function: false,
-            });
-        }
+    switchListView: function(e) {
         var self = this;
-        $('div.js-board-view-' + self.model.id).html(new App.SwitchToListView({
-            model: self.model
-        }).el);
-        var is_card_empty = true;
-        var board_view = $('.js-card-list-view-' + self.model.attributes.id);
-        var lists = self.model.lists;
-        var list_length = lists.models.length;
-        for (var list_i = 0; list_i < list_length; list_i++) {
-            var list = lists.models[list_i];
-            if (_.isUndefined(list.get('is_new')) && list.get('is_archived') === 0) {
-                self.model.cards.sortByColumn('position');
-                var filtered_cards = self.model.cards.where({
-                    list_id: list.attributes.id,
-                    is_archived: 0
+        var currenturl = window.location;
+        var currentss = currenturl.hash;
+        var get_match_url = currentss.split("/");
+        var list_view = false;
+        var trigger_list_view = false;
+        if (!_.isUndefined(get_match_url['3']) && get_match_url['3'].indexOf("list") !== -1) {
+            list_view = true;
+        }
+        if ((e.originalEvent !== undefined || e.type === 'click') && $('#listview_table').length === 0) {
+            trigger_list_view = true;
+        } else if (e.changed !== undefined && list_view) {
+            trigger_list_view = true;
+        }
+        var current_param = Backbone.history.fragment;
+        var is_filter_cards = current_param.split('?');
+        if (is_filter_cards.length > 1 && !list_view) {
+            self.$el.find('.js-clear-filter-btn').trigger('click');
+        }
+        if (trigger_list_view) {
+            $('body').removeClass('modal-open');
+            $('.js-boards-view').attr('id', 'boards-view');
+            $('#boards-view').removeClass('col-xs-12');
+            $('#switch-board-view').removeClass('calendar-view');
+            $('#switch-board-view').addClass('col-xs-12');
+            $('#switch-board-view').addClass('board-listview');
+            $('#switch-board-view').attr("id", "listview_table");
+            $('li.js-switch-view').removeClass('active');
+            $('a.js-switch-list-view').parent().addClass('active');
+            $('.js-list-form').removeClass('hide');
+            if (current_param.indexOf('/list') === -1) {
+                app.navigate('#/board/' + this.model.id + '/list', {
+                    trigger: false,
+                    trigger_function: false,
                 });
-                if (!_.isEmpty(filtered_cards)) {
-                    is_card_empty = false;
+            }
+            if ($('div.js-board-view-' + self.model.id).length === 0) {
+                $('#content').html('<section id="boards-view" class="clearfix js-boards-view"><section class="row body-no-webkit-scrollbars"><div id="listview_table" class="clearfix js-board-view-' + self.model.id + ' col-xs-12 board-listview"></div><section></section>');
+            }
+            $('div.js-board-view-' + self.model.id).html(new App.SwitchToListView({
+                model: self.model
+            }).el);
+            changeTitle('Board - ' + _.escape(self.model.attributes.name) + '- List');
+            $('main').trigger('listViewRendered');
+            var is_card_empty = true;
+            var board_view = $('.js-card-list-view-' + self.model.attributes.id);
+            self.model.lists.each(function(list) {
+                list.board = self.model;
+                list.board_users = self.model.board_users;
+                list.labels = self.model.labels;
+            });
+            var listviewsortby, listviewsortdirection;
+            if (!_.isUndefined(App.current_board) && !_.isUndefined(App.current_board) && App.current_board !== null && !_.isUndefined(App.current_board.attributes.listviewsortby) && App.current_board.attributes.listviewsortby !== null) {
+                listviewsortby = App.current_board.attributes.listviewsortby;
+                listviewsortdirection = App.current_board.attributes.listviewsortdirection;
+            } else {
+                listviewsortby = 'id';
+                listviewsortdirection = 'desc';
+            }
+            self.model.cards.sortByColumn(listviewsortby, listviewsortdirection);
+            var filtered_cards = self.model.cards.where({
+                is_archived: 0
+            });
+            if (!_.isEmpty(filtered_cards)) {
+                is_card_empty = false;
+                _.each(filtered_cards, function(card) {
+                    var list = self.model.lists.findWhere({
+                        id: card.attributes.list_id,
+                        is_archived: 0
+                    });
+                    card.list = list;
+                    if (!_.isUndefined(list) && !_.isEmpty(list)) {
+                        card.set('list_name', _.escape(list.attributes.name), {
+                            silent: true
+                        });
+                    }
+                    if (!_.isUndefined(card.labels) && !_.isEmpty(card.labels) && card.labels !== null) {
+                        card.labels.setSortField('id', 'asc');
+                        card.labels.sort();
+                        card.labels.each(function(label, key) {
+                            if (!_.isUndefined(label) && label.attributes.name !== "") {
+                                if (key === 0) {
+                                    card.set('sort_group_label', label.attributes.name);
+                                }
+                            }
+                        });
+                    }
+                    if (!_.isUndefined(card.users) && !_.isEmpty(card.users) && card.users !== null) {
+                        card.users.each(function(user, key) {
+                            if (!_.isUndefined(user) && user.attributes.username !== "") {
+                                if (key === 0) {
+                                    card.set('sort_group_user', user.attributes.username);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+            var cards = new App.CardCollection();
+            cards.comparator = function(item) {
+                var str = '' + item.get(listviewsortby);
+                if (listviewsortby === 'name' || listviewsortby === 'list_name' || listviewsortby === 'sort_group_label' || listviewsortby === 'sort_group_user') {
+                    str = str.toLowerCase();
+                    if (str !== 'undefined' && !_.isUndefined(str) && !_.isEmpty(str) && str !== null) {
+                        str = str.split('');
+                        str = _.map(str, function(letter) {
+                            if (listviewsortdirection.toLowerCase() === 'desc') {
+                                return String.fromCharCode(-(letter.charCodeAt(0)));
+                            } else {
+                                return String.fromCharCode((letter.charCodeAt(0)));
+                            }
+                        });
+                        return str;
+                    }
+                } else if (listviewsortby === 'due_date') {
+                    if (item.get('due_date') !== null && item.get(this.sortKey) !== 'NULL') {
+                        var date = item.get('due_date').split(' ');
+                        if (!_.isUndefined(date[1])) {
+                            _date = date[0] + 'T' + date[1];
+                        } else {
+                            _date = date[0];
+                        }
+                        sort_date = new Date(_date);
+                        return listviewsortdirection === 'desc' ? -sort_date.getTime() : sort_date.getTime();
+                    }
+                } else if (listviewsortby === 'start_date') {
+                    if (item.get('custom_fields') !== null && !_.isUndefined(item.get('custom_fields')) && !_.isEmpty(item.get('custom_fields'))) {
+                        var inputArr = item.get('custom_fields');
+                        var start_date_time = JSON.parse(inputArr);
+                        if (!_.isUndefined(start_date_time.start_date) && !_.isEmpty(start_date_time.start_date) && !_.isUndefined(start_date_time.start_time) && !_.isEmpty(start_date_time.start_time)) {
+                            _date = start_date_time.start_date + 'T' + start_date_time.start_time;
+                            sort_date = new Date(_date);
+                            return listviewsortdirection === 'desc' ? -sort_date.getTime() : sort_date.getTime();
+                        }
+                    }
+                } else if (listviewsortby === 'checklist_item_completed_count') {
+                    if (!_.isUndefined(item.checklists) && !_.isEmpty(item.checklists) && item.checklists !== null && item.checklists.length > 0) {
+                        return listviewsortdirection === 'desc' ? -item.get('checklist_item_completed_count') : item.get('checklist_item_completed_count');
+                    }
+                } else {
+                    if (listviewsortdirection === 'desc') {
+                        return -item.get(listviewsortby);
+                    } else {
+                        return item.get(listviewsortby);
+                    }
                 }
-                var cards = new App.CardCollection();
-                cards.reset(filtered_cards, {
-                    silent: true
-                });
-                var card_length = cards.models.length;
-                for (var i = 0; i < card_length; i++) {
-                    var card = cards.models[i];
-                    card.list_name = _.escape(list.attributes.name);
-                    card.list_id = list.attributes.id;
+            };
+            cards.reset(filtered_cards);
+            cards.each(function(card) {
+                if (parseInt(card.get('is_archived')) === 0 && !_.isUndefined(card.list) && parseInt(card.list.get('is_archived')) === 0) {
+                    var card_id = card.id;
+                    var card_list = self.model.lists.findWhere({
+                        id: parseInt(card.attributes.list_id)
+                    });
+                    card.list_name = _.escape(card_list.attributes.name);
+                    card.list_id = card_list.attributes.id;
                     card.board_users = self.model.board_users;
-                    card.labels.add(card.attributes.card_labels, {
+                    var filter_labels = self.model.labels.filter(function(model) {
+                        return parseInt(model.get('card_id')) === parseInt(card_id);
+                    });
+                    var labels = new App.CardLabelCollection();
+                    labels.add(filter_labels, {
+                        silent: true
+                    });
+                    card.labels = labels;
+                    card.labels.setSortField('id', 'asc');
+                    card.labels.sort();
+                    card.card_voters.add(card.get('card_voters'), {
                         silent: true
                     });
                     card.cards.add(self.model.cards, {
                         silent: true
                     });
-                    card.list = list;
+                    card.list = card_list;
                     card.board_activities.add(self.model.activities, {
                         silent: true
                     });
+                    filter_attachments = self.model.attachments.where({
+                        card_id: parseInt(card.id)
+                    });
+                    card.attachments.add(filter_attachments, {
+                        silent: true
+                    });
+                    card.users.setSortField('username', 'asc');
+                    card.users.sort();
+                    card.board = self.model;
                     var view = new App.CardView({
                         tagName: 'tr',
-                        className: 'card-list-view',
+                        className: 'card-list-view js-show-modal-card-view cur txt-aligns js-listview-list-id-' + card.attributes.list_id,
+                        id: 'js-card-' + card.attributes.id,
                         model: card,
                         template: 'list_view'
                     });
                     board_view.append(view.render().el);
                 }
-            }
-        }
-        if (is_card_empty) {
-            var empty_view = new App.CardView({
-                tagName: 'tr',
-                className: '',
-                model: null,
-                board_id: self.model.id,
-                template: 'list_view'
             });
-            empty_view.render();
-        } else {
-            if (!_.isUndefined(card_ids) && card_ids !== null && card_ids !== '') {
+            if (is_card_empty) {
+                var empty_view = new App.CardView({
+                    tagName: 'tr',
+                    className: '',
+                    model: null,
+                    board_id: self.model.id,
+                    template: 'list_view'
+                });
+                empty_view.render();
+            } else {
                 _.defer(function(view) {
-                    trigger_dockmodal = true;
-                    var trigger_card_ids = card_ids.split(',');
-                    for (var i = 0; i < trigger_card_ids.length; i++) {
-                        $('#js-card-' + trigger_card_ids[i]).trigger('click');
+                    if (!_.isUndefined(card_ids) && card_ids !== null && card_ids !== '') {
+                        trigger_dockmodal = true;
+                        var trigger_card_ids = card_ids.split(',');
+                        for (var i = 0; i < trigger_card_ids.length; i++) {
+                            $('#js-card-' + trigger_card_ids[i]).trigger('click');
+                        }
+                        card_ids = null;
+                        trigger_dockmodal = false;
                     }
-                    card_ids = null;
-                    trigger_dockmodal = false;
                 }, this);
-
             }
         }
         return false;
+    },
+    updateListView: function(e) {
+        var self = this;
+        var currenturl = window.location;
+        var currentss = currenturl.hash;
+        var get_match_url = currentss.split("/");
+        if (!_.isUndefined(get_match_url['3']) && get_match_url['3'] === 'list') {
+            if (!_.isUndefined(e) && e.storeName === 'card') {
+                if (e.attributes.board_id == self.model.id) {
+                    if (_.isUndefined(e.list) && self.model.lists.length) {
+                        e.list = self.model.lists.findWhere({
+                            id: parseInt(e.attributes.list_id)
+                        });
+                    }
+                    if (e.list.attributes.card_count === 1) {
+                        $('.js-switch-list-view').trigger('click');
+                    }
+                    if (_.isUndefined(e.list_name) || _.isEmpty(e.list_name)) {
+                        e.list_name = _.escape(e.list.attributes.name);
+                    }
+                    if (!_.isUndefined(e.board_users) && !_.isEmpty(e.board_users) && e.board_users !== null) {
+                        if (_.isUndefined(e.board_users.board) || _.isEmpty(e.board_users.board) || e.board_users.board === null) {
+                            e.board_users.board = self.model;
+                        }
+                    } else {
+                        e.board_users = self.model.board_users;
+                    }
+                    view = new App.CardView({
+                        tagName: 'tr',
+                        className: 'card-list-view js-show-modal-card-view cur txt-aligns js-listview-list-id-' + e.attributes.list_id,
+                        id: 'js-card-' + e.attributes.id,
+                        model: e,
+                        template: 'list_view'
+                    });
+                    if (parseInt(e.attributes.is_archived) === 0) {
+                        var card_exist = false;
+                        if ($('#js-card-' + e.attributes.id).length === 1) {
+                            if ($('#js-card-modal-' + e.attributes.id).length === 1) {
+                                card_exist = true;
+                            }
+                            $('#js-card-' + e.attributes.id).remove();
+                        }
+                        var filtered_cards = self.model.cards.where({
+                            is_archived: 0
+                        });
+                        if (filtered_cards.length === 1 || self.model.cards.length === 0) {
+                            $('.js-card-list-view-' + self.model.attributes.id).html('');
+                            $('.js-card-list-view-' + self.model.attributes.id).append(view.render().el);
+                        } else {
+                            _.each(filtered_cards, function(card) {
+                                var list = self.model.lists.findWhere({
+                                    id: card.attributes.list_id,
+                                    is_archived: 0
+                                });
+                                card.list = list;
+                                if (!_.isUndefined(list) && !_.isEmpty(list)) {
+                                    card.set('list_name', _.escape(list.attributes.name), {
+                                        silent: true
+                                    });
+                                }
+                                if (!_.isUndefined(card.labels) && !_.isEmpty(card.labels) && card.labels !== null) {
+                                    card.labels.each(function(label, key) {
+                                        if (!_.isUndefined(label) && label.attributes.name !== "") {
+                                            if (key === 0) {
+                                                card.set('sort_group_label', label.attributes.name);
+                                            }
+                                        }
+                                    });
+                                }
+                                if (!_.isUndefined(card.users) && !_.isEmpty(card.users) && card.users !== null) {
+                                    card.users.each(function(user, key) {
+                                        if (!_.isUndefined(user) && user.attributes.username !== "") {
+                                            if (key === 0) {
+                                                card.set('sort_group_user', user.attributes.username);
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                            var cards = new App.CardCollection();
+                            cards.reset(filtered_cards);
+                            var listviewsortby, listviewsortdirection;
+                            if (!_.isUndefined(App.current_board) && !_.isUndefined(App.current_board) && App.current_board !== null && !_.isUndefined(App.current_board.attributes.listviewsortby) && App.current_board.attributes.listviewsortby !== null) {
+                                listviewsortby = App.current_board.attributes.listviewsortby;
+                                listviewsortdirection = App.current_board.attributes.listviewsortdirection;
+                            } else {
+                                listviewsortby = 'id';
+                                listviewsortdirection = 'desc';
+                            }
+                            cards.sortByColumn(listviewsortby, listviewsortdirection);
+                            var list_filtered_cards = cards.where({
+                                is_archived: 0,
+                                list_id: parseInt(e.attributes.list_id),
+                            });
+                            e.list.cards.reset(list_filtered_cards);
+                            var bool = true;
+                            i = 0;
+                            cards.each(function(card) {
+                                if (bool && !_.isUndefined(card.list) && parseInt(card.list.get('is_archived')) === 0) {
+                                    if (parseInt(card.attributes.id) === parseInt(e.attributes.id)) {
+                                        if (!_.isUndefined(cards.models[i - 1])) {
+                                            var prev_card_id = cards.models[i - 1].id;
+                                            $('#js-card-' + prev_card_id).after(view.render().el);
+                                            bool = false;
+                                        } else if (!_.isUndefined(cards.models[i + 1])) {
+                                            var next_card_id = cards.models[i + 1].id;
+                                            $('#js-card-' + next_card_id).before(view.render().el);
+                                            bool = false;
+                                        } else {
+                                            $('.js-card-list-view-' + self.model.attributes.id).append(view.render().el);
+                                            bool = false;
+                                        }
+                                    }
+                                    i++;
+                                }
+                            });
+                        }
+                        if (card_exist) {
+                            $('#js-card-' + e.attributes.id).addClass('active');
+                        }
+                    } else {
+                        $('#js-card-' + e.attributes.id).remove();
+                    }
+                }
+            } else {
+                if (!_.isUndefined(e.attributes.id)) {
+                    if ($('.js-card-list-view-' + e.attributes.board_id).length === 1) {
+                        if ($('.js-card-list-view-' + e.attributes.board_id + ' .js-listview-list-id-' + e.attributes.id).length > 0) {
+                            $('.js-card-list-view-' + e.attributes.board_id + ' .js-listview-list-id-' + e.attributes.id).each(function(index) {
+                                $(this).remove();
+                            });
+                        }
+                    }
+                }
+            }
+            var arhived_cards = self.model.cards.where({
+                is_archived: 0
+            });
+            if (arhived_cards.length === 0) {
+                view = new App.CardView({
+                    tagName: 'tr',
+                    className: 'card-list-view js-show-modal-card-view cur txt-aligns',
+                    model: null,
+                    template: 'list_view'
+                });
+                view.render();
+            }
+        }
     },
     /**
      * switchCalendarView()
@@ -774,88 +1237,185 @@ App.BoardHeaderView = Backbone.View.extend({
      * @type Object(DOM event)
      *
      */
-    switchCalendarView: function() {
+    switchCalendarView: function(e) {
         var self = this;
-        $('body').removeClass('modal-open');
-        $('#boards-view').addClass('col-xs-12');
-        $('#switch-board-view').addClass('calendar-view');
-        $('#switch-board-view').removeClass('board-viewlist col-xs-12');
-        $('li.js-switch-view').removeClass('active');
-        $('a.js-switch-calendar-view').parent().addClass('active');
-        $('.js-list-form').removeClass('hide');
-        var current_param = Backbone.history.fragment;
-        if (current_param.indexOf('/calendar') === -1) {
-            app.navigate('#/board/' + this.model.id + '/calendar', {
-                trigger: false,
-                trigger_function: false,
-            });
+        var currenturl = window.location;
+        var currentss = currenturl.hash;
+        var get_match_url = currentss.split("/");
+        var calendar_view = false;
+        var trigger_calendar_view = false;
+        if (!_.isUndefined(get_match_url['3']) && get_match_url['3'] === 'calendar') {
+            calendar_view = true;
         }
-        $('div.js-board-view-' + this.model.id).html('');
-        $('div.js-board-view-' + this.model.id).fullCalendar({
-            header: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'month,basicWeek,basicDay'
-            },
-            selectable: true,
-            selectHelper: true,
-            editable: false,
-            ignoreTimezone: false,
-            aspectRatio: 3.35,
-            eventRender: function(event, element) {
-                var content = '';
-                element.addClass('js-show-modal-card-view');
-                element.attr('id', 'js-card-' + event.id);
-                var card = self.model.cards.findWhere({
-                    id: event.id
-                });
-                if (card.get('is_archived') === 1) {
-                    element.addClass('card-archived');
-                    element.find('.fc-event-skin').addClass('card-archived');
-                }
-                if (card.get('due_date') !== null) {
-                    var today = new Date();
-                    card_due_date = card.get('due_date').split('T');
-                    var due_date = new Date(card_due_date[0]);
-                    var diff = Math.floor(due_date.getTime() - today.getTime());
-                    var day = 1000 * 60 * 60 * 24;
-                    var days = Math.floor(diff / day);
-                    if (days < -1) {
-                        element.addClass('label-danger');
-                        element.find('.fc-event-skin').addClass('label-danger');
-                    } else if (days == -1) {
-                        element.addClass('label-present');
-                        element.find('.fc-event-skin').addClass('label-present');
-                    } else if (days > -1) {
-                        element.addClass('label-future');
-                        element.find('.fc-event-skin').addClass('label-future');
-                    }
-                }
-                content += '<ul class="unstyled hide js-card-labels">';
-                var filtered_labels = card.labels.where({
-                    card_id: event.id
-                });
-                var labels = new App.CardLabelCollection();
-                labels.add(filtered_labels);
-                labels.each(function(label) {
-                    if (_.escape(label.attributes.name) !== "") {
-                        content += '<li class="' + _.escape(label.attributes.name) + '">' + _.escape(label.attributes.name) + '</li>';
-                    }
-                });
-                content += '</ul>';
-                content += '<ul class="unstyled js-card-users hide">';
-                card.users.each(function(user) {
-                    content += '<li>user-filter-' + user.get('user_id') + '</li>';
-                });
-                content += '</ul>';
-                content += '<ul class="unstyled js-card-due hide">';
-                content += self.getDue(card.get('due_date'));
-                content += '</ul>';
-                element.append(content);
+        if (e.originalEvent !== undefined || e.type === 'click') {
+            trigger_calendar_view = true;
+        } else if (e.changed !== undefined && calendar_view) {
+            trigger_calendar_view = true;
+        }
+        if ($('div.js-board-view-' + this.model.id).length > 0 && !_.isUndefined(App.current_board) && $('div.js-board-view-' + this.model.id).attr('class').indexOf('calendar-view') !== -1) {
+            var selected_month = $('div.js-board-view-' + this.model.id).fullCalendar('getDate');
+            App.current_board.set('calendar_date', selected_month);
+        }
+        if (trigger_calendar_view) {
+            $('body').removeClass('modal-open');
+            $('.js-boards-view').attr('id', 'boards-view');
+            $('#boards-view').addClass('col-xs-12');
+            $('#switch-board-view').addClass('calendar-view');
+            $('#listview_table').attr("id", "switch-board-view");
+            $('#switch-board-view').removeClass('board-viewlist col-xs-12');
+            $('li.js-switch-view').removeClass('active');
+            $('a.js-switch-calendar-view').parent().addClass('active');
+            $('.js-list-form').removeClass('hide');
+            var current_param = Backbone.history.fragment;
+            var is_filter_cards = current_param.split('?');
+            if (is_filter_cards.length > 1) {
+                self.$el.find('.js-clear-filter-btn').trigger('click');
             }
-        });
-        if (!_.isEmpty(this.model.cards)) {
-            $('div.js-board-view-' + this.model.id).fullCalendar('addEventSource', this.model.cards.invoke('pick', ['id', 'title', 'start']));
+            if (current_param.indexOf('/calendar') === -1) {
+                app.navigate('#/board/' + this.model.id + '/calendar', {
+                    trigger: false,
+                    trigger_function: false,
+                });
+            }
+            changeTitle('Board - ' + _.escape(self.model.attributes.name) + '- Calendar');
+            if ($('div.js-board-view-' + self.model.id).length === 0) {
+                $('#content').html('<section id="boards-view" class="clearfix js-boards-view col-xs-12"><section class="row body-no-webkit-scrollbars"><div id="listview_table" class="clearfix js-board-view-' + self.model.id + ' col-xs-12 calendar-view"></div><section></section>');
+            }
+            $('div.js-board-view-' + this.model.id).html('');
+            $('div.js-board-view-' + this.model.id).fullCalendar({
+                header: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'month,basicWeek,basicDay'
+                },
+                selectable: true,
+                selectHelper: true,
+                editable: false,
+                ignoreTimezone: false,
+                aspectRatio: 3.35,
+                eventRender: function(event, element) {
+                    var content = '';
+                    var card = self.model.cards.findWhere({
+                        id: event.id
+                    });
+                    if (card.get('is_archived') === 1) {
+                        element.addClass('card-archived hide');
+                        element.find('.fc-event-skin').addClass('card-archived');
+                    }
+                    if (card.get('due_date') !== null && parseInt(card.get('is_archived')) === 0) {
+                        element.addClass('js-show-modal-card-view cur');
+                        element.attr('id', 'js-card-' + event.id);
+                        var today = new Date();
+                        card_due_date = card.get('due_date').split('T');
+                        var due_date = new Date(card_due_date[0]);
+                        var diff = Math.floor(due_date.getTime() - today.getTime());
+                        var day = 1000 * 60 * 60 * 24;
+                        var days = Math.floor(diff / day);
+                        if ($.trim(CALENDAR_VIEW_CARD_COLOR) === 'Past Present Future colors based on Due Date') {
+                            if (days < -1) {
+                                element.addClass('label-danger');
+                                element.find('.fc-event-skin').addClass('label-danger');
+                            } else if (days == -1) {
+                                element.addClass('label-present');
+                                element.find('.fc-event-skin').addClass('label-present');
+                            } else if (days > -1) {
+                                element.addClass('label-future');
+                                element.find('.fc-event-skin').addClass('label-future');
+                            }
+                        } else if ($.trim(CALENDAR_VIEW_CARD_COLOR) === 'Card Color') {
+                            element.css({
+                                "background-color": card.attributes.color,
+                                "color": "#fff",
+                                "border-color": "transparent"
+                            });
+                            element.find('.fc-event-skin').attr('style', 'background-color: ' + card.attributes.color + ' !important;color: #fff;border-color:transparent !important');
+                        } else if ($.trim(CALENDAR_VIEW_CARD_COLOR) === 'Color of first Label') {
+                            if (card.labels.length > 0) {
+                                var label_color;
+                                if (!_.isUndefined(card.labels.models[0].attributes.color) && !_.isEmpty(card.labels.models[0].attributes.color) && card.labels.models[0].attributes.color !== null) {
+                                    label_color = card.labels.models[0].attributes.color.replace('#', '');
+                                } else {
+                                    label_color = new App.CardView({
+                                        model: card
+                                    }).getLabelcolor(card.labels.models[0].attributes.name);
+                                }
+                                element.css({
+                                    "background-color": '#' + label_color,
+                                    "color": "#fff",
+                                    "border-color": "transparent"
+                                });
+                                element.find('.fc-event-skin').attr('style', 'background-color: #' + label_color + ' !important;color: #fff;border-color:transparent !important');
+                            }
+                        }
+                        content += '<ul class="unstyled hide js-card-labels">';
+                        var filtered_labels = card.labels.where({
+                            card_id: event.id
+                        });
+                        var labels = new App.CardLabelCollection();
+                        labels.add(filtered_labels);
+                        labels.each(function(label) {
+                            if (_.escape(label.attributes.name) !== "") {
+                                content += '<li class="' + _.escape(label.attributes.name) + '">' + _.escape(label.attributes.name) + '</li>';
+                            }
+                        });
+                        content += '</ul>';
+                        content += '<ul class="unstyled js-card-users hide">';
+                        card.users.each(function(user) {
+                            content += '<li>user-filter-' + user.get('user_id') + '</li>';
+                        });
+                        content += '</ul>';
+                        content += '<ul class="unstyled js-card-due hide">';
+                        content += self.getDue(card.get('due_date'));
+                        content += '</ul>';
+                        element.append(content);
+                    }
+
+                },
+                eventClick: function(info) {
+                    if (info.id) {
+                        trigger_dockmodal = true;
+                        var card = self.model.cards.findWhere({
+                            id: parseInt(info.id)
+                        });
+                        if (!_.isUndefined(card)) {
+                            card.list = self.model.lists.findWhere({
+                                id: card.attributes.list_id
+                            });
+                            new App.CardView({
+                                model: card
+                            }).showCardModal();
+                        }
+                        trigger_dockmodal = false;
+                    }
+                }
+            });
+            if (!_.isEmpty(self.model.cards)) {
+                var start_date, cards_custom_fields;
+                self.model.cards.each(function(card) {
+                    if (!_.isUndefined(card) && !_.isEmpty(card) && card !== null && !_.isUndefined(card.attributes.due_date) && !_.isEmpty(card.attributes.due_date) && card.attributes.due_date !== null) {
+                        card.set('start', card.attributes.due_date);
+                        card.set('end', card.attributes.due_date);
+                        if (!_.isUndefined(APPS) && APPS !== null && !_.isUndefined(APPS.enabled_apps) && APPS.enabled_apps !== null && $.inArray('r_gantt_view', APPS.enabled_apps) !== -1) {
+                            if (!_.isEmpty(card.attributes.custom_fields) && card.attributes.custom_fields != 'NULL' && !_.isUndefined(card.attributes.custom_fields)) {
+                                cards_custom_fields = JSON.parse(card.attributes.custom_fields);
+                                if (!_.isUndefined(cards_custom_fields.start_date) && !_.isUndefined(cards_custom_fields.start_time) && !_.isEmpty(cards_custom_fields.start_date) && cards_custom_fields.start_date !== '') {
+                                    start_date = cards_custom_fields.start_date + 'T' + cards_custom_fields.start_time;
+                                    card.set('start', start_date);
+                                }
+                            }
+                        }
+                    }
+                });
+                $('div.js-board-view-' + self.model.id).fullCalendar('addEventSource', self.model.cards.invoke('pick', ['id', 'title', 'start', 'end']));
+            }
+            if (!_.isUndefined(App.current_board) && !_.isEmpty(App.current_board) && App.current_board !== null && !_.isUndefined(App.current_board.attributes) && App.current_board.attributes !== null) {
+                if (!_.isUndefined(App.current_board.attributes.calendar_date) && App.current_board.attributes.calendar_date !== null) {
+                    var calendar_date = App.current_board.attributes.calendar_date;
+                    var calendar_year = calendar_date.getFullYear();
+                    var calendar_month = calendar_date.getMonth();
+                    $('div.js-board-view-' + self.model.id).fullCalendar('gotoDate', calendar_year, calendar_month);
+                }
+            }
         }
         return false;
     },
@@ -919,10 +1479,53 @@ App.BoardHeaderView = Backbone.View.extend({
     showSyncGoogleCalendar: function(e) {
         e.preventDefault();
         var el = this.$el;
+        el.find('.js-setting-response').addClass('icallfeed-dropdown');
         el.find('.js-setting-response').html(new App.ShowSyncGoogleCalendarView({
             model: this.model
         }).el);
     },
+    /**
+     * showChooseColumns()
+     * get and display list and grid view column chooser
+     * @param e
+     * @type Object(DOM event)
+     *
+     */
+    showChooseColumns: function() {
+        $('.js-side-bar-' + this.model.id).addClass('side-bar-large');
+        var el = this.$el;
+        var choose_column_dom = '';
+        if (!_.isEmpty(authuser.user) && !_.isUndefined(authuser.user)) {
+            if (!_.isEmpty(role_links.where({
+                    slug: "r_listview_configure"
+                })) || !_.isEmpty(role_links.where({
+                    slug: "r_gridview_configure"
+                }))) {
+                if (!_.isUndefined(APPS) && APPS !== null && !_.isUndefined(APPS.enabled_apps) && APPS.enabled_apps !== null && $.inArray('r_gridview_configure', APPS.enabled_apps) !== -1 && !_.isEmpty(role_links.where({
+                        slug: "r_gridview_configure"
+                    }))) {
+                    choose_column_dom += '<li class="clearfix cur card-label-show h5 btn-link media js-gridview-header-trigger"><div data-id="" class=""><div><div class="pull-left">Grid View</div></div></div></li>';
+                }
+
+                if (!_.isUndefined(APPS) && APPS !== null && !_.isUndefined(APPS.enabled_apps) && APPS.enabled_apps !== null && $.inArray('r_listview_configure', APPS.enabled_apps) !== -1 && !_.isEmpty(role_links.where({
+                        slug: "r_listview_configure"
+                    }))) {
+                    choose_column_dom += '<li class="clearfix cur card-label-show h5 btn-link media js-listview-header-trigger"><div data-id="" class=""><div><div class="pull-left">List View</div></div></div></li>';
+                }
+                el.find('.js-setting-response').html('<div class="clearfix text-center col-xs-12"><a href="#" class="js-back-to-sidebar pull-left btn btn-xs btn-link"><i class="icon-caret-left"></i></a><span class="col-xs-10 navbar-btn"><strong>' + i18next.t('Choose Columns...') + '</strong></span></div><div class="col-xs-12 divider"></div><div class="col-xs-12 member-modal js-pre-scrollable vertical-scrollbar"><div class="clearfix col-xs-12"><ul class="nav nav-pills nav-stacked label-block js-board-labels-container"> ' + choose_column_dom + '  </ul></div><hr></div>');
+                var headerH = $('header').height();
+                var windowH = $(window).height();
+                var footerH = $('footer').height();
+                var boardH = windowH - headerH - footerH - 14;
+                $('.member-modal.js-pre-scrollable').css({
+                    'max-height': boardH - 50,
+                    'overflow-y': 'auto'
+                });
+            }
+            return false;
+        }
+    },
+
     /**
      * showCopyBoard()
      * get copy board view
@@ -936,6 +1539,9 @@ App.BoardHeaderView = Backbone.View.extend({
         el.find('.js-setting-response').html(new App.ShowCopyBoardView({
             model: this.model
         }).el);
+        if (parseInt(this.model.attributes.organization_id) !== 0) {
+            this.showBoardAddeOrganizationForm(e);
+        }
     },
     /**
      * selectGoogleSyncUrl()
@@ -985,8 +1591,13 @@ App.BoardHeaderView = Backbone.View.extend({
         el.find('.js-back-setting-response').after(new App.BoardSidebarView({
             model: this.model,
         }).el);
+        var self = this;
+        _(function() {
+            if (self.model !== null && !_.isUndefined(self.model) && !_.isEmpty(self.model)) {
+                $('body').trigger('boardActionRendered', [self.model.id, self.model]);
+            }
+        }).defer();
         this.renderBoardUsers();
-        this.clearAll();
         return false;
     },
     renderBoardUsers: function() {
@@ -995,6 +1606,7 @@ App.BoardHeaderView = Backbone.View.extend({
         this.model.board_users.sortBy('board_user_role_id');
         this.model.board_users.each(function(board_user) {
             board_user.board_user_roles = self.model.board_user_roles;
+            board_user.board_users_count = self.model.board_users.length;
             self.$('.js-get-board-member-lists-response').append(new App.BoardUsersView({
                 model: board_user,
             }).el);
@@ -1010,8 +1622,6 @@ App.BoardHeaderView = Backbone.View.extend({
      */
     boardUserAvatarDropdown: function(e) {
         e.preventDefault();
-        $(e.currentTarget).addClass('open');
-        $(e.currentTarget).siblings('.dropdown').removeClass('open');
         return false;
     },
     /**
@@ -1038,10 +1648,11 @@ App.BoardHeaderView = Backbone.View.extend({
         App.boards.get(this.model.id).set('background_color', '');
 
         data = {
-            background_color: 'NULL',
-            background_picture_url: 'NULL',
-            background_pattern_url: 'NULL',
-            custom_background_url: 'NULL'
+            background_color: null,
+            background_picture_url: null,
+            background_pattern_url: null,
+            custom_background_url: null,
+            remove_background: true
         };
         this.model.save(data, {
             patch: true
@@ -1112,9 +1723,9 @@ App.BoardHeaderView = Backbone.View.extend({
         this.model.set('custom_background_url', '');
         this.model.set('background_color', '');
         data = {
-            background_color: 'NULL',
+            background_color: null,
             background_picture_url: image_path,
-            background_pattern_url: 'NULL'
+            background_pattern_url: null
         };
         this.model.save(data, {
             patch: true
@@ -1137,12 +1748,18 @@ App.BoardHeaderView = Backbone.View.extend({
         }).addClass('board-view-pattern board-view');
         this.model.url = api_url + 'boards/' + this.model.id + '.json';
         this.model.set('background_pattern_url', image_path);
-        this.model.set('custom_background_url', '');
-        this.model.set('background_picture_url', '');
-        this.model.set('background_color', '');
+        this.model.set('custom_background_url', '', {
+            silent: true
+        });
+        this.model.set('background_picture_url', '', {
+            silent: true
+        });
+        this.model.set('background_color', '', {
+            silent: true
+        });
         data = {
-            background_color: 'NULL',
-            background_picture_url: 'NULL',
+            background_color: null,
+            background_picture_url: null,
             background_pattern_url: image_path
         };
         this.model.save(data, {
@@ -1156,33 +1773,115 @@ App.BoardHeaderView = Backbone.View.extend({
      * @return false
      *
      */
-    showArchivedListLists: function() {
+    showArchivedListLists: function(e) {
+        var self = this;
+        if (!_.isUndefined(e)) {
+            self.liststart = 0;
+            self.listpage = 1;
+        }
+        self.liststart = (self.liststart !== 0) ? self.liststart : 0;
+        self.listpage = (self.listpage !== 1) ? self.listpage : 1;
+        if (this.$el.find('.js-load-more-archived-cards').hasClass('show')) {
+            this.$el.find('.js-load-more-archived-cards').removeClass('show').addClass('hide');
+        } else {
+            this.$el.find('.js-load-more-archived-cards').addClass('hide');
+        }
+        if (this.$el.find('.js-load-more-archived-lists').hasClass('hide')) {
+            this.$el.find('.js-load-more-archived-lists').removeClass('hide').addClass('show');
+        }
         if (!_.isUndefined(authuser.user) && (authuser.user.role_id == 1 || !_.isEmpty(this.model.acl_links.where({
                 slug: 'view_archived_lists',
                 board_user_role_id: parseInt(this.model.board_user_role_id)
             })))) {
             var el = this.$el;
-
-            el.find('.js-archived-items-container').html(new App.ArchivedListsView({
-                model: this.model
-            }).el);
             var filtered_lists = this.model.lists.where({
                 is_archived: 1
             });
-            if (!_.isEmpty(filtered_lists)) {
-                $('.js-delete-all-archived-lists-confirm').removeClass('hide');
-                _.each(filtered_lists, function(list) {
-                    list.board = self.model;
-                    el.find('.js-archived-cards-container').append(new App.ArchivedListView({
-                        model: list
+            var archivedlists = new App.ListCollection();
+            if (!_.isEmpty(this.listq)) {
+                if (self.listpage_filter == 1) {
+                    el.find('.js-archived-items-container').html(new App.ArchivedListsView({
+                        model: this.model
                     }).el);
+                }
+                filtered_lists = this.model.lists.filter(function(model) {
+                    return ~model.get('name').toUpperCase().indexOf(self.listq.toUpperCase());
                 });
+                archivedlists.add(filtered_lists);
+                archivedlists.sortByColumn('name', 'asc');
+                if (!_.isEmpty(archivedlists) && archivedlists.length > 0) {
+                    $('.js-delete-all-archived-lists-confirm').removeClass('hide');
+                    count = self.listpage_filter * PAGING_COUNT;
+                    _.each(archivedlists.models, function(list, key) {
+                        if (key === self.liststart_filter) {
+                            if (count > (self.liststart_filter)) {
+                                self.liststart_filter++;
+                                list.board = self.model;
+                                el.find('.js-archived-lists-container').append(new App.ArchivedListView({
+                                    model: list
+                                }).el);
+                            }
+                            if (archivedlists.length == self.liststart_filter) {
+                                self.$el.find('.js-load-more-archived-lists').removeClass('show').addClass('hide');
+                            }
+                        }
+                    });
+                } else {
+                    $('.js-delete-all-archived-lists-confirm').addClass('hide');
+                    this.$el.find('.js-load-more-archived-lists').removeClass('show').addClass('hide');
+                    el.find('.js-archived-lists-container').append(new App.ArchivedListView({
+                        model: null
+                    }).el);
+                }
             } else {
-                $('.js-delete-all-archived-lists-confirm').addClass('hide');
-                el.find('.js-archived-cards-container').append(new App.ArchivedListView({
-                    model: null
-                }).el);
+                if (self.listpage == 1) {
+                    el.find('.js-archived-items-container').html(new App.ArchivedListsView({
+                        model: this.model
+                    }).el);
+                }
+                archivedlists.add(filtered_lists);
+                archivedlists.sortByColumn('name', 'asc');
+                if (!_.isEmpty(archivedlists) && archivedlists.length > 0) {
+                    count = self.listpage * PAGING_COUNT;
+                    _.each(archivedlists.models, function(list, key) {
+                        if (key === self.liststart) {
+                            if (count > (self.liststart)) {
+                                self.liststart++;
+                                list.board = self.model;
+                                el.find('.js-archived-lists-container').append(new App.ArchivedListView({
+                                    model: list
+                                }).el);
+                            }
+                            if (archivedlists.length == self.liststart) {
+                                self.$el.find('.js-load-more-archived-lists').removeClass('show').addClass('hide');
+                            }
+                        }
+                    });
+                } else {
+                    this.$el.find('.js-load-more-archived-lists').removeClass('show').addClass('hide');
+                    $('.js-delete-all-archived-lists-confirm').addClass('hide');
+                    el.find('.js-archived-lists-container').append(new App.ArchivedListView({
+                        model: null
+                    }).el);
+                }
             }
+        }
+        return false;
+    },
+    /**
+     * loadMoreArchivedListLists()
+     * display the archived cards list
+     * @return false
+     *
+     */
+    loadMoreArchivedListLists: function(e) {
+        e.preventDefault();
+        if (!_.isEmpty(this.listq)) {
+            ++this.listpage_filter;
+            this.showArchivedListLists();
+        } else {
+            ++this.listpage;
+            this.showArchivedListLists();
         }
         return false;
     },
@@ -1193,40 +1892,43 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     showFilteredArchivedListLists: function(e) {
+        var self = this;
+        self.liststart_filter = 0;
         if (!_.isUndefined(authuser.user) && (authuser.user.role_id == 1 || !_.isEmpty(this.model.acl_links.where({
                 slug: 'view_archived_lists',
                 board_user_role_id: parseInt(this.model.board_user_role_id)
             })))) {
             var el = this.$el;
-            var search_q = $(e.currentTarget).val();
-            var filtered_lists = '';
-            if (!_.isEmpty(search_q)) {
-                filtered_lists = this.model.lists.filter(function(model) {
-                    return ~model.get('name').indexOf(search_q);
-                });
-            } else {
-                filtered_lists = this.model.lists.where({
-                    is_archived: 1
+            this.listq = $(e.currentTarget).val();
+            var filtered_lists = this.model.lists.where({
+                is_archived: 1
+            });
+            var archivedlists = new App.ListCollection();
+            if (!_.isEmpty(this.listq)) {
+                filtered_lists = filtered_lists.filter(function(model) {
+                    return ~model.get('name').toUpperCase().indexOf(self.listq.toUpperCase());
                 });
             }
-            el.find('.js-archived-cards-container').html('');
-            if (!_.isEmpty(filtered_lists)) {
-                var _i = 0;
-                _.each(filtered_lists, function(list) {
-                    if (parseInt(list.attributes.is_archived) === 1) {
-                        el.find('.js-archived-cards-container').append(new App.ArchivedListView({
-                            model: list
-                        }).el);
-                        _i++;
+            archivedlists.add(filtered_lists);
+            archivedlists.sortByColumn('name', 'asc');
+            el.find('.js-archived-lists-container').html('');
+            if (!_.isEmpty(archivedlists) && archivedlists.length > 0) {
+                _.each(archivedlists.models, function(list, key) {
+                    count = self.listpage_filter * PAGING_COUNT;
+                    if (key === self.liststart_filter) {
+                        if (count >= (self.liststart_filter)) {
+                            self.liststart_filter++;
+                            el.find('.js-archived-lists-container').append(new App.ArchivedListView({
+                                model: list
+                            }).el);
+                        }
+                        if (archivedlists.length == self.liststart_filter) {
+                            self.$el.find('.js-load-more-archived-lists').removeClass('show').addClass('hide');
+                        }
                     }
                 });
-                if (_i === 0) {
-                    el.find('.js-archived-cards-container').append(new App.ArchivedListView({
-                        model: null
-                    }).el);
-                }
             } else {
-                el.find('.js-archived-cards-container').append(new App.ArchivedListView({
+                el.find('.js-archived-lists-container').append(new App.ArchivedListView({
                     model: null
                 }).el);
             }
@@ -1244,17 +1946,44 @@ App.BoardHeaderView = Backbone.View.extend({
     sendCardTobard: function(e) {
         e.preventDefault();
         var card_id = $(e.currentTarget).data('card_id');
-        this.model.cards.findWhere({
-            id: parseInt(card_id)
-        }).set('is_archived', 0);
         var find_card = this.model.cards.findWhere({
             id: parseInt(card_id)
         });
-        this.model.cards.get(find_card.id).set('is_archived', 0);
+        var currentBoardList = App.current_board.lists.get(find_card.attributes.list_id);
+        if (!_.isUndefined(currentBoardList)) {
+            if (parseInt(currentBoardList.attributes.card_count) === 0) {
+                $('#js-card-listing-' + find_card.attributes.list_id).find('.js-list-placeholder-' + find_card.attributes.list_id).remove();
+            }
+        }
+        this.model.cards.findWhere({
+            id: parseInt(card_id)
+        }).set('is_archived', 0);
+
+        var boardsCard = App.boards.get(find_card.attributes.board_id).cards.get(parseInt(card_id));
+        if (!_.isUndefined(boardsCard)) {
+            boardsCard.set('is_archived', 0, {
+                silent: true
+            });
+        }
+        var list = App.boards.get(find_card.attributes.board_id).lists.get(find_card.attributes.list_id);
+        if (!_.isUndefined(list)) {
+            list.set('card_count', list.attributes.card_count + 1, {
+                silent: true
+            });
+        }
+        currentBoardList = App.current_board.lists.get(find_card.attributes.list_id);
+        if (!_.isUndefined(APPS) && APPS !== null && !_.isUndefined(APPS.enabled_apps) && APPS.enabled_apps !== null && $.inArray('r_agile_wip', APPS.enabled_apps) !== -1) {
+            if (currentBoardList !== null && !_.isUndefined(currentBoardList) && !_.isEmpty(currentBoardList)) {
+                $('body').trigger('cardAddRendered', [currentBoardList.id, currentBoardList]);
+            }
+        }
         $(e.currentTarget).parents('li').remove();
         var card = new App.Card();
         card.set('id', card_id);
         card.set('is_archived', 0);
+        card.unset('is_filtered', {
+            silent: true
+        });
         card.url = api_url + 'boards/' + this.model.attributes.id + '/lists/' + find_card.attributes.list_id + '/cards/' + card_id + '.json';
         card.save({
             success: function(model, response) {}
@@ -1312,16 +2041,33 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     switchGridView: function(e) {
-        $('body').addClass('modal-open');
-        e.preventDefault();
-        app.navigate('#/board/' + this.model.id, {
-            trigger: false,
-            trigger_function: false,
-        });
-        $('#content').html(new App.BoardView({
-            model: this.model
-        }).el);
-        this.board_view_height();
+        var currenturl = window.location;
+        var currentss = currenturl.hash;
+        var get_match_url = currentss.split("/");
+        var grid_view = false;
+        if (get_match_url.length === 3 && get_match_url['1'] === 'board' && $('#switch-board-view').find('#js-board-lists').length !== 0) {
+            grid_view = true;
+        }
+        if (!grid_view) {
+            var self = this;
+            $('body').addClass('modal-open');
+            $('li.js-switch-view').removeClass('active');
+            $('#listview_table').attr("id", "switch-board-view");
+            e.preventDefault();
+            var current_param = Backbone.history.fragment;
+            var is_filter_cards = current_param.split('?');
+            if (is_filter_cards.length > 1) {
+                self.$el.find('.js-clear-filter-btn').trigger('click');
+            }
+            app.navigate('#/board/' + this.model.id, {
+                trigger: false,
+                trigger_function: false,
+            });
+            $('#content').html(new App.BoardView({
+                model: this.model
+            }).el);
+            this.board_view_height();
+        }
     },
     /**
      * boardRename()
@@ -1335,6 +2081,7 @@ App.BoardHeaderView = Backbone.View.extend({
         e.preventDefault();
         var el = this.$el;
         var data = el.find('form#BoardRenameForm').serializeObject();
+        $('.js-close-popover').click();
         var board = new App.Board();
         this.model.set(data);
         App.boards.get(this.model.attributes.id).set(data, {
@@ -1382,8 +2129,12 @@ App.BoardHeaderView = Backbone.View.extend({
         var org = organizations.findWhere({
             id: parseInt(data.organization_id)
         });
-        this.model.set('organization_name', _.escape(org.attributes.name));
-        this.model.set('organization_logo_url', _.escape(org.attributes.organization_logo_url));
+        if (!_.isUndefined(org) && !_.isEmpty(org) && org !== null) {
+            this.model.set('organization_name', _.escape(org.attributes.name));
+            this.model.set('organization_logo_url', _.escape(org.attributes.organization_logo_url));
+            data.organization_name = _.escape(org.attributes.name);
+            data.organization_logo_url = _.escape(org.attributes.organization_logo_url);
+        }
         this.model.set('board_visibility', 1);
         this.model.set('organization_id', parseInt(data.organization_id));
 
@@ -1396,6 +2147,7 @@ App.BoardHeaderView = Backbone.View.extend({
         this.model.save(data, {
             patch: true
         });
+        $('main').trigger('boardHeaderRendered');
         target.parents('div.dropdown').removeClass('open');
         return false;
     },
@@ -1594,8 +2346,27 @@ App.BoardHeaderView = Backbone.View.extend({
      */
     toggleCardFilter: function(e) {
         var target = $(e.currentTarget);
-        target.toggleClass('selected', !target.hasClass('selected'));
-        this.cardFilter();
+        if (target.parent().hasClass('js-filter-conjunction')) {
+            if (target.attr('id') == 'js-mode-or') {
+                if (!$(target).hasClass('selected')) {
+                    $(target).addClass('selected');
+                }
+                if ($('li#js-mode-and').hasClass('selected')) {
+                    $('li#js-mode-and').removeClass('selected');
+                }
+            }
+            if (target.attr('id') == 'js-mode-and') {
+                if (!$(target).hasClass('selected')) {
+                    $(target).addClass('selected');
+                }
+                if ($('li#js-mode-or').hasClass('selected')) {
+                    $('li#js-mode-or').removeClass('selected');
+                }
+            }
+        } else {
+            target.toggleClass('selected', !target.hasClass('selected'));
+        }
+        this.cardFilter('is_triggered');
         return false;
     },
     /**
@@ -1606,190 +2377,78 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     cardFilter: function(e) {
-        this.$el.find('.js-clear-filter-btn').removeClass('hide').addClass('show');
-        var filter_label_arr = [],
-            filter_user_arr = [],
-            filter_data = [],
-            label_filter = [],
-            user_filter = [],
-            due_filter = [],
-            filter_due_arr = [];
-        $('i.js-filter-icon').remove();
-        $('.js-show-modal-card-view').show();
         var current_param = Backbone.history.fragment.split('?');
-        var current_url = current_param[0].split('/');
-        var filter = 'grid';
-        if (current_url.length === 3 && current_url[2] == 'list') {
-            filter = 'list';
-        } else if (current_url.length === 3 && current_url[2] == 'gantt') {
-            filter = 'gantt';
-        }
-        var filter_query = '';
-        $('li.selected > div.js-label', $('ul.js-board-labels')).each(function() {
-            filter_label_arr.push($(this).html());
-            filter_query += 'label:' + $(this).html() + ',';
-            if ($(this).next('i').length === 0) {
-                $(this).after('<i class="icon-ok js-filter-icon cur pull-right"></i>');
-            }
-        });
-        $('li.selected > div.media > span.navbar-btn > span.js-user', $('ul.js-board-users')).each(function() {
-            filter_user_arr.push($(this).parent().data('user'));
-            filter_query += '@' + $(this).parent().data('user') + ',';
-            if ($(this).next('i').length === 0) {
-                $(this).parent().parent().append('<i class="icon-ok js-filter-icon cur pull-right"></i>');
-            }
-        });
-        $('li.selected > div.media > span.js-due', $('ul.js-board-dues')).each(function() {
-            filter_due_arr.push($(this).html());
-            filter_query += 'due:' + $(this).html() + ',';
-            if ($(this).next('i').length === 0) {
-                $(this).parent().parent().append('<i class="icon-ok js-filter-icon cur pull-right"></i>');
-            }
-        });
-        var show_label_arr = [],
-            result_label_arr = [];
-        if (!_.isEmpty(filter_label_arr)) {
-            $('ul.js-card-labels li').filter(function(index) {
-                index = $.inArray($(this).text(), filter_label_arr);
-                if (index !== -1) {
-                    if (_.isUndefined(show_label_arr[index])) {
-                        show_label_arr[index] = [];
-                    }
-                    if (filter == 'list') {
-                        show_label_arr[index].push($(this).parent().parent().find('div').attr('id'));
-                    } else {
-                        show_label_arr[index].push($(this).parent().parent().attr('id'));
+        var self = this;
+        if (($('div#board_view_header').find('li.selected > div.js-label', $('ul.js-board-labels')).length !== 0 || $('div#board_view_header').find('li.selected > div.media > span.navbar-btn > span.js-user', $('ul.js-board-users')).length !== 0 || $('div#board_view_header').find('li.selected', $('ul.js-board-colors')).length !== 0 || $('div#board_view_header').find('li.selected > div.media > span.js-due', $('ul.js-board-dues')).length !== 0) || (!_.isUndefined(e) && typeof e === 'string')) {
+            if (!_.isUndefined(self.model) && !_.isEmpty(self.model)) {
+                $('div#board_view_header').find('.js-clear-filter-btn').removeClass('hide').addClass('show');
+                $('i.js-filter-icon').remove();
+                var dictFilter = filter_getFilterObject(current_param, this.model.cards);
+                var arrays = dictFilter.arrays;
+                var filter_query = dictFilter.filter_query;
+                if (_.isEmpty(arrays) && _.isEmpty(filter_query)) {
+                    if (!_.isUndefined(self.model.cards) && !_.isEmpty(self.model.cards) && self.model.cards !== null) {
+                        this.$el.find('.js-clear-filter-btn').removeClass('show').addClass('hide');
+                        app.navigate('#/' + current_param[0], {
+                            trigger: true,
+                            trigger_function: false,
+                            replace: true
+                        });
+                        var unfilteredCards = self.model.cards.filter(function(card) {
+                            return card.get('is_archived') !== 1 && card.get('is_filtered') === true;
+                        });
+                        _.each(unfilteredCards, function(card, key) {
+                            card.set('is_filtered', false);
+                        });
                     }
                 }
-            });
-            if (filter_label_arr.length != show_label_arr.length) {
-                show_label_arr = [];
-            }
-        }
-        if (!_.isEmpty(show_label_arr)) {
-            result_label_arr = show_label_arr.shift().filter(function(v) {
-                return show_label_arr.every(function(a) {
-                    return a.indexOf(v) !== -1;
-                });
-            });
-        }
-        var show_user_arr = [],
-            result_user_arr = [];
-        if (!_.isEmpty(filter_user_arr)) {
-            $('ul.js-card-users li').filter(function(index) {
-                index = $.inArray($(this).text(), filter_user_arr);
-                if (index !== -1) {
-                    if (_.isUndefined(show_user_arr[index])) {
-                        show_user_arr[index] = [];
+                if (!_.isEmpty(arrays) && !_.isEmpty(filter_query)) {
+                    var result = arrays.shift().filter(function(v) {
+                        return arrays.every(function(a) {
+                            return a.indexOf(v) !== -1;
+                        });
+                    });
+                    var unfilteredIds = [];
+                    for (var i = 0; i < result.length; i++) {
+                        if (!_.isUndefined(result[i])) {
+                            var card_id = result[i].substring(8, result[i].length);
+                            if ($.inArray(card_id, unfilteredIds) === -1) {
+                                unfilteredIds.push(parseInt(card_id));
+                            }
+                        }
                     }
-                    if (filter == 'list') {
-                        show_user_arr[index].push($(this).parent().parent().find('div').attr('id'));
-                    } else {
-                        show_user_arr[index].push($(this).parent().parent().attr('id'));
+                    self.model.cards.each(function(card) {
+                        var filter = card.get('is_archived') !== 1 && unfilteredIds.indexOf(card.get('id')) === -1;
+                        card.set('is_filtered', filter);
+                    });
+                    _.each(this.model.lists.models, function(list) {
+                        if (!$('#js-card-listing-' + list.id).find('.panel').is(':visible') && (!_.isUndefined(list.attributes.card_count) && list.attributes.card_count !== 0 && list.attributes.card_count !== null && !isNaN(list.attributes.card_count))) {
+                            $('#js-card-listing-' + list.id).prepend('<span class="js-list-placeholder-' + list.id + '">&nbsp;</span>');
+                        }
+                    });
+                    if (!_.isUndefined(unfilteredIds) && !_.isEmpty(unfilteredIds)) {
+                        if (!$('#js-empty-filter-cards').hasClass('hide')) {
+                            $('#js-empty-filter-cards').addClass('hide');
+                        }
+                    } else if ($('#js-empty-filter-cards').hasClass('hide')) {
+                        $('#js-empty-filter-cards').removeClass('hide');
                     }
+                    if ($('.js-clear-all').hasClass('text-muted')) {
+                        $('.js-clear-all').removeClass('text-muted');
+                    }
+                    filter_query = '?filter=' + filter_query.slice(0, -1);
+                    var split_length = current_param[0].split('board/');
+                    if (split_length.length === 2) {
+                        current_param[0] = 'board/' + split_length[1];
+                    }
+                    app.navigate('#/' + current_param[0] + filter_query, {
+                        trigger: false,
+                        trigger_function: false,
+                        replace: true
+                    });
                 }
-            });
-            if (filter_user_arr.length != show_user_arr.length) {
-                show_user_arr = [];
+                $('body').trigger('GanttFilterRendered');
             }
-        }
-        if (!_.isEmpty(show_user_arr)) {
-            result_user_arr = show_user_arr.shift().filter(function(v) {
-                return show_user_arr.every(function(a) {
-                    return a.indexOf(v) !== -1;
-                });
-            });
-        }
-        var show_due_arr = [],
-            result_due_arr = [];
-        if (!_.isEmpty(filter_due_arr)) {
-            $('ul.js-card-due li').filter(function(index) {
-                index = $.inArray($(this).text(), filter_due_arr);
-                if (index !== -1) {
-                    if (_.isUndefined(show_due_arr[index])) {
-                        show_due_arr[index] = [];
-                    }
-                    if (filter == 'list') {
-                        show_due_arr[index].push($(this).parent().parent().find('div').attr('id'));
-                    } else {
-                        show_due_arr[index].push($(this).parent().parent().attr('id'));
-                    }
-                }
-            });
-            if (filter_due_arr.length != show_due_arr.length) {
-                show_due_arr = [];
-            }
-        }
-        if (!_.isEmpty(show_due_arr)) {
-            var due_arr = [];
-            $.each(show_due_arr, function(index, value) {
-                if (value !== undefined) {
-                    due_arr.push(value);
-                }
-            });
-            result_due_arr = due_arr.shift().filter(function(v) {
-                return due_arr.every(function(a) {
-                    return a.indexOf(v) !== -1;
-                });
-            });
-        }
-        var arrays = [];
-        if (!_.isEmpty(filter_label_arr)) {
-            arrays.push(result_label_arr);
-        }
-        if (!_.isEmpty(filter_user_arr)) {
-            arrays.push(result_user_arr);
-        }
-        if (!_.isEmpty(filter_due_arr)) {
-            arrays.push(result_due_arr);
-        }
-
-        if (!_.isEmpty(arrays)) {
-            var result = arrays.shift().filter(function(v) {
-                return arrays.every(function(a) {
-                    return a.indexOf(v) !== -1;
-                });
-            });
-            var show_card_list = '',
-                hide_card_list = '';
-            for (i = 0; i < result.length; i++) {
-                show_card_list += '#' + result[i] + ', ';
-                hide_card_list += ':not(#' + result[i] + ')';
-            }
-            show_card_list = show_card_list.substring(0, show_card_list.lastIndexOf(', '));
-            if (filter == 'gantt') {
-                gantt_card_ids = [];
-                _.each(show_card_list.replace(/#js-card-/g, '').split(','), function(card_id) {
-                    gantt_card_ids.push(parseInt(card_id));
-                });
-                this.ganttView(gantt_card_ids, true);
-            } else {
-                $(show_card_list).show();
-                $('.js-show-modal-card-view' + hide_card_list).hide();
-            }
-        } else if (filter_label_arr.length || filter_user_arr.length || filter_due_arr.length) {
-            $('.js-show-modal-card-view').hide();
-        } else if (filter == 'gantt' && _.isEmpty(filter_label_arr) && _.isEmpty(filter_user_arr) && _.isEmpty(filter_due_arr)) {
-            gantt_card_ids = [];
-            this.ganttView(gantt_card_ids, false);
-        }
-        if ($('.js-clear-all').hasClass('text-muted')) {
-            $('.js-clear-all').removeClass('text-muted');
-        }
-        if (filter_query) {
-            filter_query = '?filter=' + filter_query.slice(0, -1);
-            app.navigate('#/' + current_param[0] + filter_query, {
-                trigger: true,
-                trigger_function: false,
-                replace: true
-            });
-        } else {
-            this.$el.find('.js-clear-filter-btn').removeClass('show').addClass('hide');
-            app.navigate('#/' + current_param[0], {
-                trigger: true,
-                trigger_function: false,
-                replace: true
-            });
         }
     },
     /**
@@ -1884,6 +2543,8 @@ App.BoardHeaderView = Backbone.View.extend({
             patch: true
         });
         var target = $(e.target);
+        target.parents('div.dropdown').find('.js-board-visibility:first').html('<i class="icon-lock"></i><span class="hidden-xs">' + i18next.t('Private') + '</span>');
+        $('main').trigger('boardHeaderRendered');
         target.parents('div.dropdown').removeClass('open');
         return false;
     },
@@ -1910,6 +2571,8 @@ App.BoardHeaderView = Backbone.View.extend({
             patch: true
         });
         var target = $(e.target);
+        target.parents('div.dropdown').find('.js-board-visibility:first').html('<i class="icon-circle"></i><span class="hidden-xs">' + i18next.t('Public') + '</span>');
+        $('main').trigger('boardHeaderRendered');
         target.parents('div.dropdown').removeClass('open');
         return false;
     },
@@ -1922,16 +2585,52 @@ App.BoardHeaderView = Backbone.View.extend({
      *
      */
     clearAll: function() {
-        $('.js-board-dues, .js-board-users, .js-board-labels').find('.js-filter-icon').remove();
-        $('.js-board-dues, .js-board-users, .js-board-labels').children().removeClass('selected');
+        $('.js-board-dues, .js-board-users, .js-board-labels, .js-board-colors').find('.js-filter-icon').remove();
+        if ($('li#js-mode-and > i.js-filter_mode-icon').length === 1) {
+            $('#js-mode-and').find('.js-filter_mode-icon').remove();
+        }
+        if ($('li#js-mode-or > i.js-filter_mode-icon').length === 0) {
+            $('li#js-mode-or').append('<i class="icon-ok js-filter_mode-icon cur pull-right"></i>');
+        }
+        $('.js-board-dues, .js-board-users, .js-board-labels, .js-board-colors').children().removeClass('selected');
+        if ($('#js-mode-and').hasClass('selected')) {
+            $('#js-mode-and').removeClass('selected');
+        }
         $('.js-clear-all').addClass('text-muted');
-        $('.js-show-modal-card-view').show();
-        app.navigate('#/board/' + this.model.attributes.id, {
+        if (!$('#js-empty-filter-cards').hasClass('hide')) {
+            $('#js-empty-filter-cards').addClass('hide');
+        }
+        var self = this;
+        var current_param = Backbone.history.fragment.split('?');
+        var current_url = current_param[0].split('/');
+        var filter = '';
+        if (current_url.length === 3 && current_url[2] == 'list') {
+            filter = 'list';
+        } else if (current_url.length === 3 && current_url[2] == 'gantt') {
+            filter = 'gantt';
+        }
+        if (!_.isEmpty(filter)) {
+            filter = '/' + filter;
+        }
+        app.navigate('#/board/' + this.model.attributes.id + filter, {
             trigger: false,
-            trigger_function: false,
-            replace: true
+            trigger_function: false
+        });
+        if (!_.isUndefined(self.model.cards) && !_.isEmpty(self.model.cards) && self.model.cards !== null) {
+            var cards = self.model.cards.filter(function(card) {
+                return card.get('is_archived') !== 1 && card.get('is_filtered') === true;
+            });
+            _.each(cards, function(card, key) {
+                card.set('is_filtered', false);
+            });
+        }
+        _.each(this.model.lists.models, function(list) {
+            if (list.attributes.card_count !== 0 && $('#js-card-listing-' + list.id).find('.js-list-placeholder-' + list.id).length > 0) {
+                $('#js-card-listing-' + list.id).find('.js-list-placeholder-' + list.id).remove();
+            }
         });
         this.$el.find('.js-clear-filter-btn').removeClass('show').addClass('hide');
+        $('body').trigger('GanttFilterRendered');
         return false;
     },
     /**

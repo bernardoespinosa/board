@@ -8,7 +8,9 @@ if (typeof App === 'undefined') {
     App = {};
 }
 var loginExceptionUrl = ['register', 'login', 'forgotpassword', 'user_activation', 'aboutus'];
-var adminUrl = ['roles', 'activities', 'users', 'oauth_clients', 'apps', 'settings', 'email_templates'];
+var adminUrl = ['roles', 'activities', 'users', 'boards/list', 'oauth_clients', 'apps', 'user_logins', 'settings', 'email_templates', 'user_logins'];
+var adminUrlModels = ['role_settings', 'activity_index', 'users_index', 'admin_boards_index', 'oauth_clients', 'apps', 'user_logins_index', 'settings', 'email_template_type', 'user_logins_index'];
+var exceptionAppPage = ['r_wikipages'];
 /**
  * Application View
  * @class ApplicationView
@@ -23,9 +25,13 @@ App.ApplicationView = Backbone.View.extend({
      * initialize default values and actions
      */
     initialize: function(options) {
-        $('#content').html('');
+        if (adminUrlModels.indexOf(options.model) === -1 && options.model !== 'boards_index' && options.model !== 'boards_view') {
+            $('#content').html('');
+        }
         $('#footer').removeClass('action-open');
+        $('.tooltip').remove();
         var page = this;
+        page.options = options;
         page.page_view_type = options.type;
         page.page_view_id = options.id;
         page.page_view_hash = options.hash;
@@ -50,9 +56,13 @@ App.ApplicationView = Backbone.View.extend({
                 $.cookie('music_play', "1");
             }
         }
-        if (role_links.length === 0 && $.cookie('links') !== undefined && $.cookie('links') !== null) {
-            role_links.add(JSON.parse($.cookie('links')));
-        }
+        localforage.getItem('links', function(err, value) {
+            if (value) {
+                if (role_links.length === 0 && value !== undefined && value !== null) {
+                    role_links.add(JSON.parse(value));
+                }
+            }
+        });
         if (page.model !== 'boards_view') {
             viewed_board = new App.Board();
         }
@@ -66,82 +76,73 @@ App.ApplicationView = Backbone.View.extend({
                     success: function(model, response) {
                         api_token = response.access_token;
                         if (!_.isUndefined(response.links)) {
-                            $.cookie('links', response.links);
+                            localforage.setItem("links", response.links);
                         }
                         $.cookie('languages', response.languages);
-                        localforage.setItem('apps', response.apps).then(function() {
-                            role_links.add(JSON.parse(response.links));
-                            settings.url = api_url + 'settings.json';
-                            settings.fetch({
-                                cache: false,
-                                abortPending: true,
-                                success: function(collection, settings_response) {
-                                    SITE_NAME = settings_response.SITE_NAME;
-                                    page.set_page_title();
-                                    FLICKR_API_KEY = settings_response.FLICKR_API_KEY;
-                                    DROPBOX_APPKEY = settings_response.DROPBOX_APPKEY;
-                                    LABEL_ICON = settings_response.LABEL_ICON;
-                                    SITE_TIMEZONE = settings_response.SITE_TIMEZONE;
-                                    DEFAULT_LANGUAGE = settings_response.DEFAULT_LANGUAGE;
-                                    PAGING_COUNT = settings_response.PAGING_COUNT;
-                                    APPS = settings_response.apps;
-                                    IMAP_EMAIL = settings_response.IMAP_EMAIL;
-                                    DEFAULT_CARD_VIEW = settings_response.DEFAULT_CARD_VIEW;
-                                    var current_language = DEFAULT_LANGUAGE;
-                                    if ($.cookie('auth') !== undefined && $.cookie('auth') !== null) {
-                                        current_language = authuser.user.language;
-                                    }
-                                    i18next.use(window.i18nextXHRBackend).use(window.i18nextSprintfPostProcessor).init({
-                                        lng: current_language,
-                                        fallbackLng: current_language,
-                                        load: "all",
-                                        keySeparator: '~',
-                                        nsSeparator: '^',
-                                        backend: {
-                                            loadPath: "locales/{{lng}}/{{ns}}.json"
-                                        }
-                                    }, function() {
-                                        if (page.model === "admin_user_add" || page.model === "register") {
-                                            //@Todo
-                                            page.call_function();
-
-                                        } else {
-
-                                            page.call_function();
-                                        }
-                                    });
-                                }
+                        //Collection of overall active apps
+                        if (!_.isEmpty(response.apps) && !_.isUndefined(response.apps)) {
+                            var local_storage_apps = JSON.parse(response.apps);
+                            var get_names = [];
+                            _.each(local_storage_apps, function(data) {
+                                get_names.push(data.name);
                             });
-                        });
-                    },
-                    error: function() {
-                        app.navigate('#/users/login', {
-                            trigger: true,
-                            replace: true
-                        });
-                    },
-                });
-            } else {
-                if (settings.length === 0) {
-                    settings.fetch({
-                        cache: false,
-                        abortPending: true,
-                        success: function(collection, settings_response) {
-                            SITE_NAME = settings_response.SITE_NAME;
-                            localforage.setItem('apps', settings_response.apps_data).then(function() {
+                            get_names.sort();
+                            _.each(get_names, function(data) {
+                                _.each(local_storage_apps, function(datas) {
+                                    if (data === datas.name) {
+                                        if (!_.isEmpty(datas.large_description) && !_.isUndefined(datas.large_description)) {
+                                            datas.large_description = datas.large_description.join('\n');
+                                        }
+                                        overallApps.push(datas);
+                                    }
+                                });
+                            });
+                        }
+                        role_links.add(JSON.parse(response.links));
+                        settings.url = api_url + 'settings.json';
+                        settings.fetch({
+                            cache: false,
+                            abortPending: true,
+                            success: function(collection, settings_response) {
+                                SITE_NAME = settings_response.SITE_NAME;
                                 page.set_page_title();
                                 FLICKR_API_KEY = settings_response.FLICKR_API_KEY;
                                 DROPBOX_APPKEY = settings_response.DROPBOX_APPKEY;
                                 LABEL_ICON = settings_response.LABEL_ICON;
                                 SITE_TIMEZONE = settings_response.SITE_TIMEZONE;
+                                IS_TWO_FACTOR_AUTHENTICATION_ENABLED = settings_response.IS_TWO_FACTOR_AUTHENTICATION_ENABLED;
                                 DEFAULT_LANGUAGE = settings_response.DEFAULT_LANGUAGE;
                                 PAGING_COUNT = settings_response.PAGING_COUNT;
+                                ALLOWED_FILE_EXTENSIONS = settings_response.ALLOWED_FILE_EXTENSIONS;
+                                R_LDAP_LOGIN_HANDLE = settings_response.R_LDAP_LOGIN_HANDLE;
+                                R_MLDAP_LOGIN_HANDLE = settings_response.R_MLDAP_LOGIN_HANDLE;
+                                R_MLDAP_SERVERS = settings_response.R_MLDAP_SERVERS;
                                 APPS = settings_response.apps;
                                 IMAP_EMAIL = settings_response.IMAP_EMAIL;
                                 DEFAULT_CARD_VIEW = settings_response.DEFAULT_CARD_VIEW;
-                                var current_language = DEFAULT_LANGUAGE;
-                                if ($.cookie('auth') !== undefined && $.cookie('auth') !== null && authuser.user.language !== null && authuser.user.language !== undefined) {
+                                CALENDAR_VIEW_CARD_COLOR = settings_response.CALENDAR_VIEW_CARD_COLOR;
+                                var current_language;
+                                if ($.cookie('auth') !== undefined && $.cookie('auth') !== null && authuser.user.language !== null && !_.isUndefined(authuser.user.language) && !_.isEmpty(authuser.user.language)) {
                                     current_language = authuser.user.language;
+                                } else if (navigator.language || navigator.userLanguage) {
+                                    var languages = ($.cookie('languages')) ? $.cookie('languages').split(',') : null;
+                                    if (languages !== null) {
+                                        languages = JSON.parse(languages);
+                                    }
+                                    current_language = navigator.language || navigator.userLanguage;
+                                    var language_reg = current_language.split('-');
+                                    if (language_reg.length > 1) {
+                                        language_reg['1'] = language_reg['1'].toUpperCase();
+                                    }
+                                    current_language = language_reg.join('_');
+                                    current_language = current_language.replace("-", "_");
+                                    if (!_.isUndefined(languages) && !_.isEmpty(languages) && languages !== null) {
+                                        if (_.isUndefined(languages[current_language]) || languages[current_language] === null || _.isEmpty(languages[current_language])) {
+                                            current_language = DEFAULT_LANGUAGE;
+                                        }
+                                    }
+                                } else {
+                                    current_language = DEFAULT_LANGUAGE;
                                 }
                                 i18next.use(window.i18nextXHRBackend).use(window.i18nextSprintfPostProcessor).init({
                                     lng: current_language,
@@ -158,9 +159,135 @@ App.ApplicationView = Backbone.View.extend({
                                         page.call_function();
 
                                     } else {
+
                                         page.call_function();
                                     }
                                 });
+                            }
+                        });
+                    },
+                    error: function() {
+                        app.navigate('#/users/login', {
+                            trigger: true,
+                            replace: true
+                        });
+                    },
+                });
+            } else {
+                if (settings.length === 0) {
+                    settings.fetch({
+                        cache: false,
+                        abortPending: true,
+                        success: function(collection, settings_response) {
+                            SITE_NAME = settings_response.SITE_NAME;
+                            //Collection of overall active apps
+                            if (!_.isEmpty(settings_response.apps_data) && !_.isUndefined(settings_response.apps_data)) {
+                                var local_storage_apps = JSON.parse(settings_response.apps_data);
+                                var get_names = [];
+                                _.each(local_storage_apps, function(data) {
+                                    get_names.push(data.name);
+                                });
+                                get_names.sort();
+                                _.each(get_names, function(data) {
+                                    _.each(local_storage_apps, function(datas) {
+                                        if (data === datas.name) {
+                                            if (!_.isEmpty(datas.large_description) && !_.isUndefined(datas.large_description)) {
+                                                datas.large_description = datas.large_description.join('\n');
+                                            }
+                                            overallApps.push(datas);
+                                        }
+                                    });
+                                });
+                            }
+                            if (role_links.length === 0) {
+                                localforage.getItem('links', function(err, value) {
+                                    if (value) {
+                                        if (role_links.length === 0 && value !== undefined && value !== null) {
+                                            role_links.add(JSON.parse(value));
+                                        }
+                                        if (!_.isUndefined(APPS) && APPS !== null && !_.isEmpty(APPS.enabled_apps) && !_.isUndefined(APPS.enabled_apps) && APPS.enabled_apps !== null) {
+                                            APPS.permission_checked_apps = [];
+                                            _.each(APPS.enabled_apps, function(app) {
+                                                if (!_.isEmpty(authuser.user) && !_.isUndefined(authuser.user)) {
+                                                    if ((!_.isEmpty(role_links.where({
+                                                            slug: app
+                                                        })) || parseInt(authuser.user.role_id) === 1) && $.inArray(app, APPS.permission_checked_apps) === -1) {
+                                                        APPS.permission_checked_apps.push(app);
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                            page.set_page_title();
+                            FLICKR_API_KEY = settings_response.FLICKR_API_KEY;
+                            DROPBOX_APPKEY = settings_response.DROPBOX_APPKEY;
+                            LABEL_ICON = settings_response.LABEL_ICON;
+                            SITE_TIMEZONE = settings_response.SITE_TIMEZONE;
+                            IS_TWO_FACTOR_AUTHENTICATION_ENABLED = settings_response.IS_TWO_FACTOR_AUTHENTICATION_ENABLED;
+                            DEFAULT_LANGUAGE = settings_response.DEFAULT_LANGUAGE;
+                            PAGING_COUNT = settings_response.PAGING_COUNT;
+                            ALLOWED_FILE_EXTENSIONS = settings_response.ALLOWED_FILE_EXTENSIONS;
+                            R_LDAP_LOGIN_HANDLE = settings_response.R_LDAP_LOGIN_HANDLE;
+                            R_MLDAP_LOGIN_HANDLE = settings_response.R_MLDAP_LOGIN_HANDLE;
+                            R_MLDAP_SERVERS = settings_response.R_MLDAP_SERVERS;
+                            APPS = settings_response.apps;
+                            if (!_.isUndefined(APPS) && APPS !== null && !_.isEmpty(APPS.enabled_apps) && !_.isUndefined(APPS.enabled_apps) && APPS.enabled_apps !== null) {
+                                APPS.permission_checked_apps = [];
+                                _.each(APPS.enabled_apps, function(app) {
+                                    if (!_.isEmpty(authuser.user) && !_.isUndefined(authuser.user)) {
+                                        if ((!_.isEmpty(role_links.where({
+                                                slug: app
+                                            })) || parseInt(authuser.user.role_id) === 1) && $.inArray(app, APPS.permission_checked_apps) === -1) {
+                                            APPS.permission_checked_apps.push(app);
+                                        }
+                                    }
+                                });
+                            }
+                            IMAP_EMAIL = settings_response.IMAP_EMAIL;
+                            DEFAULT_CARD_VIEW = settings_response.DEFAULT_CARD_VIEW;
+                            CALENDAR_VIEW_CARD_COLOR = settings_response.CALENDAR_VIEW_CARD_COLOR;
+                            var current_language;
+                            if ($.cookie('auth') !== undefined && $.cookie('auth') !== null && authuser.user.language !== null && !_.isUndefined(authuser.user.language) && !_.isEmpty(authuser.user.language)) {
+                                current_language = authuser.user.language;
+                            } else if (navigator.language || navigator.userLanguage) {
+                                var languages = ($.cookie('languages')) ? $.cookie('languages').split(',') : null;
+                                if (languages !== null) {
+                                    languages = JSON.parse(languages);
+                                }
+                                current_language = navigator.language || navigator.userLanguage;
+                                var language_reg = current_language.split('-');
+                                if (language_reg.length > 1) {
+                                    language_reg['1'] = language_reg['1'].toUpperCase();
+                                }
+                                current_language = language_reg.join('_');
+                                current_language = current_language.replace("-", "_");
+                                if (!_.isUndefined(languages) && !_.isEmpty(languages) && languages !== null) {
+                                    if (_.isUndefined(languages[current_language]) || languages[current_language] === null || _.isEmpty(languages[current_language])) {
+                                        current_language = DEFAULT_LANGUAGE;
+                                    }
+                                }
+                            } else {
+                                current_language = DEFAULT_LANGUAGE;
+                            }
+                            i18next.use(window.i18nextXHRBackend).use(window.i18nextSprintfPostProcessor).init({
+                                lng: current_language,
+                                fallbackLng: current_language,
+                                load: "all",
+                                keySeparator: '~',
+                                nsSeparator: '^',
+                                backend: {
+                                    loadPath: "locales/{{lng}}/{{ns}}.json"
+                                }
+                            }, function() {
+                                if (page.model === "admin_user_add" || page.model === "register") {
+                                    //@Todo
+                                    page.call_function();
+
+                                } else {
+                                    page.call_function();
+                                }
                             });
                         }
                     });
@@ -181,6 +308,9 @@ App.ApplicationView = Backbone.View.extend({
     set_page_title: function() {
         if (this.model == 'login') {
             changeTitle(i18next.t('Login'));
+        }
+        if (this.model == 'user_verification') {
+            changeTitle(i18next.t('Two-step Verification'));
         }
         if (this.model == 'aboutus') {
             changeTitle(i18next.t('About'));
@@ -224,6 +354,9 @@ App.ApplicationView = Backbone.View.extend({
         if (this.model == 'users_index') {
             changeTitle(i18next.t('Users'));
         }
+        if (this.model == 'user_logins_index') {
+            changeTitle(i18next.t('User Logins'));
+        }
         if (this.model == 'admin_boards_index') {
             changeTitle(i18next.t('Boards'));
         }
@@ -241,6 +374,9 @@ App.ApplicationView = Backbone.View.extend({
         }
         if (this.model == 'apps' || this.model == 'app_settings') {
             changeTitle(i18next.t('Apps'));
+        }
+        if (this.model == 'apps' || this.model == 'app_settings_manage') {
+            changeTitle(i18next.t('Apps Manage'));
         }
         if (this.model == 'organizations_index') {
             changeTitle(i18next.t('Organizations'));
@@ -262,7 +398,7 @@ App.ApplicationView = Backbone.View.extend({
      */
     board_view: function() {
         var self = this;
-        if (viewed_board.id !== parseInt(self.id)) {
+        if (parseInt(viewed_board.id) !== parseInt(self.id)) {
             var Board = new App.Board({
                 id: self.id
             });
@@ -274,6 +410,8 @@ App.ApplicationView = Backbone.View.extend({
                 success: function(model, response) {
                     if (!_.isUndefined(response.error)) {
                         $.cookie('redirect_link', window.location.hash);
+                        changeTitle('Board not found');
+                        $('#content').html('');
                         $('#content').html(new App.Board404View({
                             model: authuser
                         }).el);
@@ -292,6 +430,10 @@ App.ApplicationView = Backbone.View.extend({
                                         $.each(list.cards, function(card_key, card) {
                                             if (card) {
                                                 cards[card.id] = card.custom_fields;
+                                                // Resets this boards cards collection
+                                                Board.cards.add(card, {
+                                                    silent: true
+                                                });
                                             }
                                         });
                                     }
@@ -299,6 +441,8 @@ App.ApplicationView = Backbone.View.extend({
                                         custom_fields: list.custom_fields,
                                         cards: cards
                                     };
+                                    // Resets this boards lists collection
+                                    Board.lists.add(list);
                                 }
                             });
                         }
@@ -310,6 +454,75 @@ App.ApplicationView = Backbone.View.extend({
                         Board.authuser = self.authuser;
                         viewed_board = Board;
                         Board.board_user_roles = response.board_user_roles;
+                        // Resets this boards users collection
+                        if (!_.isUndefined(response.boards_users) && !_.isEmpty(response.boards_users)) {
+                            $.each(response.boards_users, function(key, board_user) {
+                                Board.board_users.add(board_user);
+                            });
+                        }
+                        // Resets this boards activities collection
+                        if (!_.isUndefined(response.activities) && !_.isEmpty(response.activities)) {
+                            $.each(response.activities, function(key, activity) {
+                                Board.activities.add(activity, {
+                                    silent: true
+                                });
+                            });
+                        }
+                        // Resets this boards custom attachments collection
+                        if (!_.isUndefined(response.custom_backgrounds) && !_.isEmpty(response.custom_backgrounds)) {
+                            $.each(response.custom_backgrounds, function(key, custom_background) {
+                                Board.custom_attachments.add(custom_background, {
+                                    silent: true
+                                });
+                            });
+                        }
+                        // Resets this boards attachments collection
+                        if (!_.isUndefined(response.attachments) && !_.isEmpty(response.attachments)) {
+                            $.each(response.attachments, function(key, attachment) {
+                                Board.attachments.add(attachment, {
+                                    silent: true
+                                });
+                            });
+                        }
+                        // Resets this boards subscribers collection
+                        if (!_.isUndefined(response.boards_subscribers) && !_.isEmpty(response.boards_subscribers)) {
+                            $.each(response.boards_subscribers, function(key, boards_subscriber) {
+                                Board.board_subscribers.add(boards_subscriber, {
+                                    silent: true
+                                });
+                            });
+                        }
+                        // Resets this boards stars collection
+                        if (!_.isUndefined(response.boards_stars) && !_.isEmpty(response.boards_stars)) {
+                            $.each(response.boards_stars, function(key, boards_star) {
+                                Board.board_stars.add(boards_star, {
+                                    silent: true
+                                });
+                            });
+                        }
+                        // Resets this boards stars collection
+                        if (!_.isUndefined(response.acl_links) && !_.isEmpty(response.acl_links)) {
+                            $.each(response.acl_links, function(key, acl_link) {
+                                Board.acl_links.add(acl_link, {
+                                    silent: true
+                                });
+                            });
+                        }
+
+                        if (!_.isUndefined(authuser.user)) {
+                            var board_user_role_id = Board.board_users.findWhere({
+                                user_id: parseInt(authuser.user.id)
+                            });
+                            if (!_.isEmpty(board_user_role_id)) {
+                                Board.board_user_role_id = board_user_role_id.attributes.board_user_role_id;
+                            }
+                        }
+                        App.current_board = Board;
+                        $('#header').html(new App.BoardHeaderView({
+                            model: Board,
+                        }).el);
+                        changeTitle('Board - ' + _.escape(Board.attributes.name));
+                        $('#content').html('');
                         $('#content').html(new App.BoardView({
                             model: Board
                         }).el);
@@ -330,14 +543,17 @@ App.ApplicationView = Backbone.View.extend({
                         } else if (view_type === 'calendar') {
                             $('.js-switch-calendar-view').trigger('click');
                             view_type = null;
-                        } else if (view_type === 'attachments') {
-                            $('.js-show-board-modal').trigger('click');
-                            view_type = null;
+                        } else if (!_.isEmpty(view_type) && !_.isEmpty(view_type)) {
+                            $('#content .js-boards-view').addClass('hide');
+                            _(function() {
+                                $('#content .js-boards-view').remove('');
+                                $('#content').html('<section id="boards-view-' + view_type + '" class="clearfix js-boards-view col-xs-12"></section>');
+                                view_type = null;
+                            }).defer();
                         } else if (view_type === null || view_type === '') {
                             $('.js-switch-grid-view').trigger('click');
                             view_type = null;
                         }
-                        App.current_board = Board;
                         this.footerView = new App.FooterView({
                             model: authuser,
                             board_id: self.id,
@@ -357,7 +573,7 @@ App.ApplicationView = Backbone.View.extend({
                         }
                         var current_param = Backbone.history.fragment;
                         var current_param_split = current_param.split('/');
-                        if (current_param.indexOf('list') === -1 && current_param.indexOf('calendar') === -1) {
+                        if (current_param.indexOf('list') === -1 && current_param.indexOf('calendar') === -1 && current_param.indexOf('gantt') === -1 && current_param.indexOf('report') === -1) {
                             $('a.js-switch-grid-view').parent().addClass('active');
                         }
                     }
@@ -365,6 +581,7 @@ App.ApplicationView = Backbone.View.extend({
                 },
                 error: function(model, response) {
                     $.cookie('redirect_link', window.location.hash);
+                    changeTitle('Board not found');
                     $('#content').html(new App.Board404View({
                         model: authuser
                     }).el);
@@ -377,10 +594,33 @@ App.ApplicationView = Backbone.View.extend({
 
         } else {
             if (view_type === 'list') {
-                $('.js-switch-list-view').trigger('click');
+                $('#content').html('');
                 view_type = null;
+                if ($('#listview_table').length === 0) {
+                    $('.js-switch-list-view').trigger('click');
+                }
             } else if (view_type === 'calendar') {
-                $('.js-switch-calendar-view').trigger('click');
+                view_type = null;
+                if ($('.calendar-view').length === 0) {
+                    $('.js-switch-calendar-view').trigger('click');
+                }
+            } else if (view_type === 'gantt') {
+                $('div.js-board-view-' + self.id).html('<div class="well-sm"></div><div class="col-lg-12 col-md-12 col-sm-12 col-xs-12 well-lg"><div class="panel panel-default"><div class="panel-body text-center"><i class="fa fa-cog fa-spin"></i><h4 class="lead">' + i18next.t('Loading ....') + '</h4></div></div></div>');
+                _(function() {
+                    $('.js-switch-timeline-view').trigger('click');
+                }).defer();
+                view_type = null;
+            } else if (view_type === 'report') {
+                if ($('#boards-view-' + view_type).length === 0) {
+                    $('#content .js-boards-view').remove('');
+                    $('#content').html('<section id="boards-view-' + view_type + '" class="clearfix js-boards-view col-xs-12"></section>');
+                }
+                view_type = null;
+            } else if (view_type === 'wiki' || view_type === 'manage_wiki') {
+                if ($('#boards-view-' + view_type).length === 0) {
+                    $('#content .js-boards-view').remove('');
+                    $('#content').html('<section id="boards-view-' + view_type + '" class="clearfix js-boards-view col-xs-12"></section>');
+                }
                 view_type = null;
             } else if (view_type === 'attachments') {
                 $('.js-show-board-modal').trigger('click');
@@ -407,11 +647,16 @@ App.ApplicationView = Backbone.View.extend({
             cache: false,
             abortPending: true,
             success: function(model, response) {
-                if (!_.isUndefined(response.error) && response.error.message == 'Unauthorized') {
-                    app.navigate('#/users/login', {
-                        trigger: true,
-                        replace: true
+                if (!_.isUndefined(response.error) && response.error.message === 'Unauthorized') {
+                    $.cookie('redirect_link', window.location.hash);
+                    changeTitle('Organization not found');
+                    $('#content').html(new App.Organization404View({
+                        model: authuser
+                    }).el);
+                    this.headerView = new App.HeaderView({
+                        model: authuser
                     });
+                    $('#header').html(this.headerView.el);
                 } else {
                     Organization.boards.add(Organization.attributes.boards_listing);
                     Organization.organization_user_roles = response.organization_user_roles;
@@ -442,6 +687,8 @@ App.ApplicationView = Backbone.View.extend({
                 load_boards = true;
             }
         }
+        var fragment = Backbone.history.fragment.split('?');
+        fragment = fragment['0'];
         if ((App.boards === undefined || load_boards) && !_.isUndefined(authuser.user)) {
             var boards = new App.BoardCollection();
             boards.url = api_url + 'boards.json?type=simple';
@@ -451,6 +698,7 @@ App.ApplicationView = Backbone.View.extend({
                 success: function(model, response) {
                     App.boards = boards;
                     page.populateLists();
+                    page.populateCards();
                     page.populateBoardStarred();
                     var organizations = new App.OrganizationCollection();
                     organizations.url = api_url + 'organizations.json?type=simple';
@@ -459,7 +707,7 @@ App.ApplicationView = Backbone.View.extend({
                         abortPending: true,
                         success: function(collections, response) {
                             auth_user_organizations = organizations;
-                            if ((_.indexOf(adminUrl, Backbone.history.fragment) >= 0 && !_.isEmpty(authuser.user) && authuser.user.role_id == 1) || _.indexOf(adminUrl, Backbone.history.fragment) < 0) {
+                            if ((_.indexOf(adminUrl, fragment) >= 0 && !_.isEmpty(authuser.user) && authuser.user.role_id == 1) || _.indexOf(adminUrl, fragment) < 0) {
                                 page.callback();
                             } else {
                                 app.navigate('#/boards', {
@@ -472,7 +720,7 @@ App.ApplicationView = Backbone.View.extend({
                 }
             });
         } else {
-            if ((_.indexOf(adminUrl, Backbone.history.fragment) >= 0 && !_.isEmpty(authuser.user) && authuser.user.role_id == 1) || _.indexOf(adminUrl, Backbone.history.fragment) < 0) {
+            if ((_.indexOf(adminUrl, fragment) >= 0 && !_.isEmpty(authuser.user) && authuser.user.role_id == 1) || _.indexOf(adminUrl, fragment) < 0) {
                 page.callback();
             } else {
                 app.navigate('#/boards', {
@@ -481,14 +729,28 @@ App.ApplicationView = Backbone.View.extend({
                 });
             }
         }
-        if (page.model !== 'boards_view' && page.model !== 'users_index') {
-            $('#header').html(this.headerView.el);
+        if (page.model !== 'boards_view' && page.model !== 'users_index' && page.model !== 'user_logins_index' && page.model !== 'admin_boards_index' && page.model !== 'boards_index') {
+            if (page.model == 'app_page') {
+                if (!_.isEmpty(page.options.name) && !_.isUndefined(page.options.name)) {
+                    var page_name = page.options.name + '' + page.options.page;
+                    if (exceptionAppPage.indexOf(page_name) === -1) {
+                        $('#header').html(this.headerView.el);
+                    }
+                }
+            } else {
+                $('#header').html(this.headerView.el);
+            }
         }
         $.cookie('previous_url', Backbone.history.getFragment());
     },
     populateLists: function() {
         App.boards.each(function(board) {
             board.lists.add(board.attributes.lists);
+        });
+    },
+    populateCards: function() {
+        App.boards.each(function(board) {
+            board.cards.add(board.attributes.cards);
         });
     },
     populateBoardStarred: function() {
@@ -503,11 +765,7 @@ App.ApplicationView = Backbone.View.extend({
             if (!$('body').hasClass('board-view')) {
                 $('body').css('background', 'transparent');
             }
-            if (!_.isEmpty(role_links.where({
-                    slug: 'view_board'
-                }))) {
-                page.board_view();
-            }
+            page.board_view();
         } else if (page.model == 'organizations_view') {
             changeTitle(i18next.t('Organization'));
             page.organization_view();
@@ -533,19 +791,37 @@ App.ApplicationView = Backbone.View.extend({
         } else {
             if (page.model == 'admin_user_add') {
                 changeTitle(i18next.t('Admin Add User'));
-                var AdminUser = new App.User();
-                this.pageView = new App.AdminUserAddView({
-                    model: AdminUser
+                var timezone = new App.User();
+                timezone.url = api_url + 'timezones.json';
+                timezone.fetch({
+                    cache: false,
+                    abortPending: true,
+                    success: function(timezone, response) {
+                        var AdminUser = new App.User();
+                        AdminUser.timezones = response;
+                        this.pageView = new App.AdminUserAddView({
+                            model: AdminUser
+                        });
+                        $('#content').html(this.pageView.el);
+                    }
                 });
-                $('#content').html(this.pageView.el);
             } else if (page.model == 'register') {
                 changeTitle(i18next.t('Register'));
                 $('.company').removeClass('hide');
                 var User = new App.User();
-                this.pageView = new App.RegisterView({
-                    model: User
-                });
-                $('#content').html(this.pageView.el);
+                if (!_.isEmpty(role_links.where({
+                        slug: 'users_register'
+                    }))) {
+                    this.pageView = new App.RegisterView({
+                        model: User
+                    });
+                    $('#content').html(this.pageView.el);
+                } else {
+                    app.navigate('#/users/login', {
+                        trigger: true,
+                        replace: true
+                    });
+                }
             } else if (page.model == 'login') {
                 changeTitle(i18next.t('Login'));
                 $('.company').removeClass('hide');
@@ -554,6 +830,22 @@ App.ApplicationView = Backbone.View.extend({
                     model: LoginUser
                 });
                 $('#content').html(this.pageView.el);
+            } else if (page.model == 'user_verification') {
+                changeTitle(i18next.t('Two-step Verification'));
+                $('.company').removeClass('hide');
+                var user_verification = new App.User();
+                user_verification.url = api_url + 'users/' + page.id + '.json';
+                user_verification.fetch({
+                    cache: false,
+                    abortPending: true,
+                    success: function(user_verification, response) {
+                        this.pageView = new App.AuthenticateView({
+                            model: user_verification,
+                            templateName: 'two-step-verification'
+                        });
+                        $('#content').html(this.pageView.el);
+                    }
+                });
             } else if (page.model == 'forgotpassword') {
                 changeTitle(i18next.t('Forgot your password'));
                 $('.company').removeClass('hide');
@@ -592,12 +884,7 @@ App.ApplicationView = Backbone.View.extend({
                     changeTitle(i18next.t('Closed Boards'));
                     page_title = i18next.t('Closed Boards');
                 }
-                this.headerView = new App.BoardIndexHeaderView({
-                    model: page_title,
-                });
-                $('#header').html(new App.BoardIndexHeaderView({
-                    model: page_title,
-                }).el);
+
                 var board_index = $('#content');
                 board_index.html('');
                 var self = this;
@@ -613,35 +900,82 @@ App.ApplicationView = Backbone.View.extend({
                             cache: false,
                             abortPending: true,
                             success: function(board_model, board_response) {
+                                App.boards = boards;
+                                $('#header').html(page.headerView.el);
+                                this.headerView = new App.BoardIndexHeaderView({
+                                    model: page_title,
+                                });
+                                $('#header').html(new App.BoardIndexHeaderView({
+                                    model: page_title,
+                                }).el);
+                                $('body').removeAttr('style class');
                                 board_index.append(new App.UserDashboardView({
                                     model: page_title,
                                 }).el);
                                 if (page.model == 'starred_boards_index') {
-                                    board_index.append(new App.StarredBoardsIndexView().el);
+                                    board_index.find('#boards-index').append(new App.StarredBoardsIndexView().el);
                                     if (!_.isEmpty(role_links.where({
                                             slug: 'view_stared_boards'
                                         }))) {
                                         if (!_.isEmpty(response.starred_boards)) {
+                                            var starred_board_collections = new App.BoardCollection();
                                             _.each(response.starred_boards, function(starred_board) {
-                                                var board = App.boards.findWhere({
-                                                    id: parseInt(starred_board),
-                                                    is_closed: 0
-                                                });
-                                                if (!_.isUndefined(board)) {
-                                                    board.board_subscribers.add(board.attributes.boards_subscribers);
+                                                starred_board_collections.add(App.boards.findWhere({
+                                                    id: parseInt(starred_board)
+                                                }));
+                                            });
+                                            starred_board_collections.setSortField('name', 'asc');
+                                            starred_board_collections.sort();
+                                            var starred_boards = starred_board_collections.where({
+                                                is_closed: 0,
+                                                organization_id: 0
+                                            });
+                                            if (!_.isUndefined(starred_boards)) {
+                                                _.each(starred_boards, function(starred_board) {
+                                                    starred_board.board_subscribers.add(starred_board.attributes.boards_subscribers);
                                                     filter = _.matches({
                                                         is_archived: 0
                                                     });
-                                                    filtered_lists = _.filter(board.attributes.lists, filter);
-                                                    board.lists.add(filtered_lists);
-                                                    $('.js-header-starred-boards').append(new App.BoardSimpleView({
-                                                        model: board,
-                                                        id: 'js-starred-board-' + board.attributes.id,
-                                                        className: 'col-lg-3 col-md-4 col-sm-4 col-xs-12 mob-no-pad js-board-view js-board-view-' + board.attributes.id,
+                                                    filtered_lists = _.filter(starred_board.attributes.lists, filter);
+                                                    starred_board.lists.add(filtered_lists);
+                                                    $('.js-header-starred-boards').prepend(new App.BoardSimpleView({
+                                                        model: starred_board,
+                                                        id: 'js-starred-board-' + starred_board.attributes.id,
+                                                        className: 'col-lg-3 col-md-4 col-sm-4 col-xs-12 mob-no-pad js-board-view js-board-view-' + starred_board.attributes.id,
                                                         starred_boards: response.starred_boards
                                                     }).el);
+                                                });
+                                            }
+                                            starred_board_collections.setSortField('organization_name', 'asc');
+                                            starred_board_collections.sort();
+                                            var organization_starred_boards = starred_board_collections.filter(function(board) {
+                                                if (parseInt(board.attributes.organization_id) !== 0 && parseInt(board.attributes.is_closed) === 0) {
+                                                    return board;
                                                 }
                                             });
+                                            if (!_.isEmpty(organization_starred_boards) && !_.isUndefined(organization_starred_boards)) {
+                                                _.each(organization_starred_boards, function(organization_starred_board) {
+                                                    organization_starred_board.board_subscribers.add(organization_starred_board.attributes.boards_subscribers);
+                                                    filter = _.matches({
+                                                        is_archived: 0
+                                                    });
+                                                    filtered_lists = _.filter(organization_starred_board.attributes.lists, filter);
+                                                    organization_starred_board.lists.add(filtered_lists);
+                                                    if ($('.js-organization-starred-boards-' + organization_starred_board.attributes.organization_id).length === 0) {
+                                                        var starred_board_organization_name = filterXSS(organization_starred_board.attributes.organization_name);
+                                                        $('.js-header-starred-boards').parent().append('<div class="col-xs-12 js-organization-starred-boards-' + organization_starred_board.attributes.organization_id + '"><h4><a href="#/organization/' + organization_starred_board.attributes.organization_id + '" class="cur">' + i18next.t('%s', {
+                                                            postProcess: 'sprintf',
+                                                            sprintf: [starred_board_organization_name]
+                                                        }) + '</a></h4></div>');
+                                                    }
+                                                    $('.js-organization-starred-boards-' + organization_starred_board.attributes.organization_id).append(new App.BoardSimpleView({
+                                                        model: organization_starred_board,
+                                                        id: 'js-starred-board-' + organization_starred_board.attributes.id,
+                                                        className: 'col-lg-3 col-md-4 col-sm-4 col-xs-12 mob-no-pad js-board-view js-board-view-' + organization_starred_board.attributes.id,
+                                                        starred_boards: response.starred_boards
+                                                    }).el);
+                                                });
+                                            }
                                             if ($('.js-header-starred-boards > .js-board-view').length === 0) {
                                                 $('.js-header-starred-boards').append(new App.BoardSimpleView({
                                                     model: null,
@@ -667,13 +1001,16 @@ App.ApplicationView = Backbone.View.extend({
 
                                     }
                                 } else if (page.model == 'closed_boards_index') {
-                                    board_index.append(new App.ClosedBoardsIndexView().el);
+                                    board_index.find('#boards-index').append(new App.ClosedBoardsIndexView().el);
                                     if (!_.isEmpty(role_links.where({
                                             slug: 'view_closed_boards'
                                         }))) {
                                         var closed_boards = App.boards.where({
-                                            is_closed: 1
+                                            is_closed: 1,
+                                            organization_id: 0
                                         });
+                                        App.boards.setSortField('name', 'asc');
+                                        App.boards.sort();
                                         if (!_.isEmpty(closed_boards)) {
                                             _.each(closed_boards, function(closed_board) {
                                                 closed_board.board_subscribers.add(closed_board.attributes.boards_subscribers);
@@ -711,13 +1048,46 @@ App.ApplicationView = Backbone.View.extend({
                                                 className: 'col-lg-3 col-md-3 col-sm-4 col-xs-12'
                                             }).el);
                                         }
-
+                                        var organization_closed_boards = App.boards.filter(function(board) {
+                                            if (parseInt(board.attributes.is_closed) == 1 && parseInt(board.attributes.organization_id) !== 0) {
+                                                return board;
+                                            }
+                                        });
+                                        App.boards.setSortField('organization_name', 'asc');
+                                        App.boards.sort();
+                                        if (!_.isEmpty(organization_closed_boards)) {
+                                            _.each(organization_closed_boards, function(closed_organization_board) {
+                                                if ($('.js-organization-' + closed_organization_board.attributes.organization_id).length === 0) {
+                                                    if ($('.js-organization-closed-boards-' + closed_organization_board.attributes.organization_id).length === 0) {
+                                                        var closed_board_organization_name = filterXSS(closed_organization_board.attributes.organization_name);
+                                                        $('.js-header-closed-boards').parent().append('<div class="col-xs-12 js-organization-closed-boards-' + closed_organization_board.attributes.organization_id + '"><h4><a href="#/organization/' + closed_organization_board.attributes.organization_id + '" class="cur">' + i18next.t('%s', {
+                                                            postProcess: 'sprintf',
+                                                            sprintf: [closed_board_organization_name]
+                                                        }) + '</a></h4></div>');
+                                                    }
+                                                }
+                                                closed_organization_board.board_subscribers.add(closed_organization_board.attributes.boards_subscribers);
+                                                filter = _.matches({
+                                                    is_archived: 0
+                                                });
+                                                filtered_lists = _.filter(closed_organization_board.attributes.lists, filter);
+                                                closed_organization_board.lists.add(filtered_lists);
+                                                $('.js-organization-closed-boards-' + closed_organization_board.attributes.organization_id).append(new App.BoardSimpleView({
+                                                    model: closed_organization_board,
+                                                    id: 'js-my-board-' + closed_organization_board.attributes.id,
+                                                    className: 'col-lg-3 col-md-4 col-sm-4 col-xs-12 mob-no-pad js-board-view js-board-view-' + closed_organization_board.attributes.id,
+                                                    starred_boards: response.starred_boards
+                                                }).el);
+                                            });
+                                        }
                                     }
                                 } else {
-                                    board_index.append(new App.BoardsIndexView().el);
-                                    var my_boards = '';
-                                    my_boards = App.boards.where({
-                                        is_closed: 0
+                                    board_index.find('#boards-index').append(new App.BoardsIndexView().el);
+                                    App.boards.setSortField('name', 'asc');
+                                    App.boards.sort();
+                                    var my_boards = App.boards.where({
+                                        is_closed: 0,
+                                        organization_id: 0
                                     });
                                     if (!_.isEmpty(role_links.where({
                                             slug: 'view_my_boards'
@@ -753,6 +1123,54 @@ App.ApplicationView = Backbone.View.extend({
                                                 className: 'col-lg-3 col-md-3 col-sm-4 col-xs-12'
                                             }).el);
                                         }
+                                        App.boards.setSortField('organization_name', 'asc');
+                                        App.boards.sort();
+                                        var organization_boards = App.boards.filter(function(board) {
+                                            if (parseInt(board.attributes.is_closed) === 0 && parseInt(board.attributes.organization_id) !== 0) {
+                                                return board;
+                                            }
+                                        });
+                                        if (!_.isEmpty(organization_boards)) {
+                                            _.each(organization_boards, function(board) {
+                                                if ($('.js-organization-' + board.attributes.organization_id).length === 0) {
+                                                    var is_orgnaization_member = [];
+                                                    if (!_.isUndefined(board.attributes.organization_users) && !_.isEmpty(board.attributes.organization_users) && board.attributes.organization_users !== null && !_.isUndefined(authuser) && !_.isEmpty(authuser) && authuser !== null) {
+                                                        is_orgnaization_member = board.attributes.organization_users.filter(function(org_user) {
+                                                            return parseInt(org_user.user_id) === parseInt(authuser.user.id);
+                                                        }).length;
+                                                    }
+                                                    var organization_name = filterXSS(board.attributes.organization_name);
+                                                    var organization_name_content = '';
+                                                    organization_name_content += '<div class="col-xs-12 js-organization_boards js-organization-' + board.attributes.organization_id + '" data-organization_id ="' + board.attributes.organization_id + '" ><h4>';
+                                                    if (is_orgnaization_member !== 0 || parseInt(board.attributes.organization_visibility) === 1 || parseInt(authuser.user.role_id) === 1) {
+                                                        organization_name_content += '<a href="#/organization/' + board.attributes.organization_id + '" class="cur">' + i18next.t('%s', {
+                                                            postProcess: 'sprintf',
+                                                            sprintf: [organization_name]
+                                                        }) + '</a>';
+                                                    } else if (parseInt(board.attributes.organization_visibility) === 2) {
+                                                        organization_name_content += '<a href="javascript:void(0);" class="cur">' + i18next.t('Private Organization') + '</a>';
+                                                    }
+                                                    organization_name_content += '</h4></div>';
+                                                    $('.js-my-boards').parent().append(organization_name_content);
+                                                }
+                                                var board_filter = _.matches({
+                                                    is_archived: 0
+                                                });
+                                                var board_filtered_lists = _.filter(board.attributes.lists, board_filter);
+                                                board.lists.add(board_filtered_lists);
+                                                $('.js-organization-' + board.attributes.organization_id).append(new App.BoardSimpleView({
+                                                    model: board,
+                                                    id: 'js-my-board-' + board.attributes.id,
+                                                    className: 'col-lg-3 col-md-4 col-sm-4 col-xs-12 mob-no-pad js-board-view js-board-view-' + board.attributes.id,
+                                                    starred_boards: response.starred_boards
+                                                }).el);
+                                            });
+                                            $('.js-organization_boards').append(new App.BoardSimpleView({
+                                                model: null,
+                                                id: 'js-my-board-empty',
+                                                className: 'col-lg-3 col-md-4 col-sm-4 col-xs-12 mob-no-pad',
+                                            }).el);
+                                        }
                                     }
                                 }
 
@@ -762,10 +1180,19 @@ App.ApplicationView = Backbone.View.extend({
                 });
             } else if (page.model == 'users_index') {
                 changeTitle(i18next.t('Users'));
-                new App.AdminUserIndexView();
+                new App.AdminUserIndexView({
+                    page: page.options.page
+                });
+            } else if (page.model == 'user_logins_index') {
+                changeTitle(i18next.t('Users Logins'));
+                new App.AdminUserLoginView({
+                    page: page.options.page
+                });
             } else if (page.model == 'admin_boards_index') {
                 changeTitle(i18next.t('Boards'));
-                new App.AdminBoardsListView();
+                new App.AdminBoardsListView({
+                    page: page.options.page
+                });
             } else if (page.model == 'settings') {
                 changeTitle(i18next.t('Settings'));
                 $('#js-navbar-default').remove();
@@ -818,7 +1245,8 @@ App.ApplicationView = Backbone.View.extend({
                             acl_board_links: acl_board_links,
                             board_user_roles: board_user_roles,
                             acl_organization_links: acl_organization_links,
-                            organization_user_roles: organization_user_roles
+                            organization_user_roles: organization_user_roles,
+                            option: page.options
                         }).el);
                     }
                 });
@@ -900,6 +1328,32 @@ App.ApplicationView = Backbone.View.extend({
                         }).el);
                     }
                 });
+            } else if (page.model == 'app_settings_manage') {
+                changeTitle(i18next.t('App Settings Manage'));
+                $('#js-navbar-default').remove();
+                if (!_.isEmpty(authuser.user) && authuser.user.role_id == 1 && !_.isEmpty(page.options.name)) {
+                    var custom_field_page_id = 'admin_' + page.options.name + '_view';
+                    $('#content').html('<section id="' + custom_field_page_id + '"></section>');
+                } else {
+                    app.navigate('#/boards', {
+                        trigger: true,
+                        replace: true
+                    });
+                }
+            } else if (page.model == 'app_page') {
+                changeTitle(i18next.t('App Page'));
+                $('#js-navbar-default').remove();
+                if (!_.isEmpty(authuser.user) && authuser.user) {
+                    var app_page = page.options.name + '_' + page.options.page;
+                    if ($('#content').find('#' + app_page).length === 0) {
+                        $('#content').html('<section id="' + app_page + '"></section>');
+                    }
+                } else {
+                    app.navigate('#/boards', {
+                        trigger: true,
+                        replace: true
+                    });
+                }
             } else if (page.model == 'email_template_type') {
                 changeTitle(i18next.t('Email Templates'));
                 $('#js-navbar-default').remove();
@@ -920,10 +1374,17 @@ App.ApplicationView = Backbone.View.extend({
             authuser.board_id = 0;
         }
         if (($.cookie('auth') !== undefined && $.cookie('auth') !== null) || page.model == 'organizations_view') {
-            this.footerView = new App.FooterView({
-                model: authuser
-            }).render();
-            $('#footer').html(this.footerView.el);
+            if (adminUrlModels.indexOf(page.model) === -1 || $('#footer-menu').length === 0) {
+                this.footerView = new App.FooterView({
+                    model: authuser
+                }).render();
+                $('#footer').html(this.footerView.el);
+            } else if (adminUrlModels.indexOf(page.model) !== -1 && $('#footer-menu').length === 1 && $('#footer .js-product-beat-action').length === 1) {
+                this.footerView = new App.FooterView({
+                    model: authuser
+                }).render();
+                $('#footer').html(this.footerView.el);
+            }
             if (!_.isUndefined(authuser.user)) {
                 var count = authuser.user.notify_count;
                 if (count > 0) {
@@ -936,10 +1397,12 @@ App.ApplicationView = Backbone.View.extend({
             }
         } else {
             if (Backbone.history.fragment.indexOf('board/') != -1 || Backbone.history.fragment.indexOf('organization/') != -1 || Backbone.history.fragment.indexOf('boards') != -1) {
-                this.footerView = new App.FooterView({
-                    model: authuser,
-                }).render();
-                $('#footer').html(this.footerView.el);
+                if (Backbone.history.fragment.indexOf('organization/') != -1 || Backbone.history.fragment.indexOf('boards') != -1) {
+                    this.footerView = new App.FooterView({
+                        model: authuser,
+                    }).render();
+                    $('#footer').html(this.footerView.el);
+                }
             } else {
                 $('#footer').html('');
             }

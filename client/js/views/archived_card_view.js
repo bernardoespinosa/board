@@ -38,7 +38,41 @@ App.ArchivedCardView = Backbone.View.extend({
      * functions to fire on events (Mouse events, Keyboard Events, Frame/Object Events, Form Events, Drag Events, etc...)
      */
     events: {
-        'click .js-delete-archived-card': 'deleteArchivedCard',
+        'click .js-delete-archived-card-confirm': 'deleteArchivedCardConfirm',
+        'click .js-show-modal-card-view': 'showCardModal'
+    },
+    /**
+     * showCardModal()
+     * show card detail in docmodal
+     * @param e
+     * @type Object(DOM event)
+     * @return false
+     *
+     */
+    showCardModal: function(e) {
+        e.preventDefault();
+        var self = this;
+        trigger_dockmodal = true;
+        var card = self.model.board.cards.findWhere({
+            id: parseInt(self.model.id)
+        });
+        if (!_.isUndefined(card)) {
+            card.list = self.model.board.lists.findWhere({
+                id: card.attributes.list_id
+            });
+            var filter_labels = self.model.board.labels.filter(function(model) {
+                return parseInt(model.get('card_id')) === parseInt(self.model.id);
+            });
+            var labels = new App.CardLabelCollection();
+            labels.add(filter_labels, {
+                silent: true
+            });
+            card.labels = labels;
+            new App.CardView({
+                model: card
+            }).showCardModal();
+        }
+        trigger_dockmodal = false;
     },
     /**
      * render()
@@ -50,9 +84,7 @@ App.ArchivedCardView = Backbone.View.extend({
     render: function() {
         this.$el.html(this.template({
             card: this.model
-            //board: this.model.list.collection.board
         }));
-        this.showTooltip();
         return this;
     },
     /**
@@ -63,14 +95,10 @@ App.ArchivedCardView = Backbone.View.extend({
      * @return false
      *
      */
-    deleteArchivedCard: function(e) {
-        e.preventDefault();
-        this.model.collection.remove([{
-            id: this.model.attributes.id
-        }]);
-        this.$el.remove();
-        this.model.url = api_url + 'boards/' + this.model.attributes.board_id + '/lists/' + this.model.attributes.list_id + '/cards/' + this.model.attributes.id + '.json';
-        this.model.destroy();
+    deleteArchivedCardConfirm: function(e) {
+        $('.js-setting-response').html(new App.ArchivedCardDeleteConfirmView({
+            model: this.model,
+        }).el);
         return false;
     }
 });

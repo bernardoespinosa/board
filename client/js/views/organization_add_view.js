@@ -40,7 +40,6 @@ App.OrganizationAddView = Backbone.View.extend({
     validateDescription: function() {
         var self = this;
         var q = this.$el.find('#inputOrganizationDescription').val();
-        console.log(q);
         if (!_.isEmpty(q)) {
             self.$el.find('.error-msg-name').remove();
             self.$el.find('.error-msg-description').remove();
@@ -82,6 +81,7 @@ App.OrganizationAddView = Backbone.View.extend({
                 $('.error-msg-description').remove();
                 $('<div class="error-msg-description text-primary h6">' + i18next.t('Whitespace is not allowed') + '</div>').insertAfter('#inputOrganizationDescription');
             }
+            $('#js-add-organization').removeClass('disabled');
         } else {
             $('.error-msg-name').remove();
             $('.error-msg-description').remove();

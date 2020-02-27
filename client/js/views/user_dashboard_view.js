@@ -25,6 +25,9 @@ App.UserDashboardView = Backbone.View.extend({
         'click .dashboard-search': 'dashboardSearch'
     },
     template: JST['templates/user_dashboard'],
+    tagName: 'section',
+    className: 'clearfix',
+    id: 'boards-index',
     /**
      * render()
      * populate the html to the dom
@@ -37,6 +40,8 @@ App.UserDashboardView = Backbone.View.extend({
         this.$el.html(this.template({
             page_title: this.model,
         }));
+        /*The IntroView has been called here*/
+        var introView = new App.intro_video_view();
         this.showTooltip();
         return this;
     }
